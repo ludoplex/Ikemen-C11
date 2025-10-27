@@ -19,9 +19,13 @@ On macOS or Linux, double-click `Ikemen_GO.command`.
 ## Developing
 These instructions are for those interested in developing the Ikemen GO engine itself. Instructions for creating custom stages, fonts, characters and other resources can be found in the community forum.
 
-### Building
-For setup and platform-specific steps, see [BUILDING.md](./BUILDING.md).
+### Building the Go Version
+For setup and platform-specific steps for the **Go version**, see [BUILDING.md](./BUILDING.md).
 It covers Windows, Linux (including ARM64), and macOS (Apple Silicon and Intel).
+
+### Building the C11 Version
+For setup and platform-specific steps for the **C11 version**, see [BUILDING_C11.md](./BUILDING_C11.md).
+The C11 version is a work-in-progress refactoring that aims for better performance.
 
 ### Debugging
 In order to run the compiled Ikemen GO executable, you will need to download the [engine dependencies](https://github.com/ikemen-engine/Ikemen_GO-Elecbyte-Screenpack) and unpack them into the Ikemen-GO source directory. After that, you can use [Goland](https://www.jetbrains.com/go/) or [Visual Studio Code](https://code.visualstudio.com/) to debug.
