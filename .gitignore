@@ -49,11 +49,6 @@ build/ffmpeg/
 build/delaylib/
 build/winres/
 
-# C11 Build
-build_c11/
-Ikemen_C11
-Ikemen_C11.exe
-
 # macOS bundle by local make
 /I.K.E.M.E.N-Go.app/
 
