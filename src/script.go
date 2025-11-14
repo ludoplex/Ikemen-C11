@@ -288,7 +288,7 @@ func systemScriptInit(l *lua.LState) {
 		return 2
 	})
 	luaRegister(l, "animGetPreloadedCharData", func(l *lua.LState) int {
-		if anim := sys.sel.GetChar(int(numArg(l, 1))).anims.get(int16(numArg(l, 2)), int16(numArg(l, 3))); anim != nil {
+		if anim := sys.sel.GetChar(int(numArg(l, 1))).anims.get(int32(numArg(l, 2)), int32(numArg(l, 3))); anim != nil {
 			pfx := newPalFX()
 			pfx.clear()
 			pfx.time = -1
@@ -303,7 +303,7 @@ func systemScriptInit(l *lua.LState) {
 		return 0
 	})
 	luaRegister(l, "animGetPreloadedStageData", func(l *lua.LState) int {
-		if anim := sys.sel.GetStage(int(numArg(l, 1))).anims.get(int16(numArg(l, 2)), int16(numArg(l, 3))); anim != nil {
+		if anim := sys.sel.GetStage(int(numArg(l, 1))).anims.get(int32(numArg(l, 2)), int32(numArg(l, 3))); anim != nil {
 			pfx := newPalFX()
 			pfx.clear()
 			pfx.time = -1
@@ -327,7 +327,7 @@ func systemScriptInit(l *lua.LState) {
 		}
 		var spr *Sprite
 		if !nilArg(l, 3) {
-			spr = a.anim.sff.GetSprite(int16(numArg(l, 2)), int16(numArg(l, 3)))
+			spr = a.anim.sff.GetSprite(uint16(numArg(l, 2)), uint16(numArg(l, 3)))
 		} else {
 			spr = a.anim.spr
 		}
@@ -720,13 +720,13 @@ func systemScriptInit(l *lua.LState) {
 			window = &[...]int32{int32(numArg(l, 8)), int32(numArg(l, 9)), int32(numArg(l, 10)), int32(numArg(l, 11))}
 		}
 		var ok bool
-		var group int16
+		var group uint16
 		tableArg(l, 2).ForEach(func(key, value lua.LValue) {
 			if !ok {
 				if int(lua.LVAsNumber(key))%2 == 1 {
-					group = int16(lua.LVAsNumber(value))
+					group = uint16(lua.LVAsNumber(value))
 				} else {
-					sprite := sys.cgi[pn-1].sff.getOwnPalSprite(group, int16(lua.LVAsNumber(value)), &sys.cgi[pn-1].palettedata.palList)
+					sprite := sys.cgi[pn-1].sff.getOwnPalSprite(group, uint16(lua.LVAsNumber(value)), &sys.cgi[pn-1].palettedata.palList)
 					if fspr := sprite; fspr != nil {
 						pfx := sys.chars[pn-1][0].getPalfx()
 						sys.cgi[pn-1].palettedata.palList.SwapPalMap(&pfx.remap)
@@ -796,11 +796,10 @@ func systemScriptInit(l *lua.LState) {
 			copyAnim := CopyAnim(a)
 			char := sys.sel.GetChar(int(numArg(l, 2)))
 			for _, c := range copyAnim.anim.frames {
-				// Ignore special / invalid frames
 				if c.Group < 0 || c.Number < 0 {
 					continue
 				}
-				spr, ok := copyAnim.anim.sff.sprites[[...]int16{c.Group, c.Number}]
+				spr, ok := copyAnim.anim.sff.sprites[[2]uint16{uint16(c.Group), uint16(c.Number)}]
 				if !ok || spr == nil {
 					continue
 				}
@@ -2217,7 +2216,7 @@ func systemScriptInit(l *lua.LState) {
 	})
 	luaRegister(l, "preloadListChar", func(*lua.LState) int {
 		if !nilArg(l, 2) {
-			sys.sel.charSpritePreload[[...]int16{int16(numArg(l, 1)), int16(numArg(l, 2))}] = true
+			sys.sel.charSpritePreload[[...]uint16{uint16(numArg(l, 1)), uint16(numArg(l, 2))}] = true
 		} else {
 			sys.sel.charAnimPreload = append(sys.sel.charAnimPreload, int32(numArg(l, 1)))
 		}
@@ -2225,7 +2224,7 @@ func systemScriptInit(l *lua.LState) {
 	})
 	luaRegister(l, "preloadListStage", func(*lua.LState) int {
 		if !nilArg(l, 2) {
-			sys.sel.stageSpritePreload[[...]int16{int16(numArg(l, 1)), int16(numArg(l, 2))}] = true
+			sys.sel.stageSpritePreload[[...]uint16{uint16(numArg(l, 1)), uint16(numArg(l, 2))}] = true
 		} else {
 			sys.sel.stageAnimPreload = append(sys.sel.stageAnimPreload, int32(numArg(l, 1)))
 		}
@@ -2940,7 +2939,12 @@ func systemScriptInit(l *lua.LState) {
 		if !ok {
 			userDataError(l, 1, ts)
 		}
-		ts.SetColor(int32(numArg(l, 2)), int32(numArg(l, 3)), int32(numArg(l, 4)))
+		// Default alpha to 255 for compatibility
+		a := int32(255)
+		if !nilArg(l, 5) {
+			a = int32(MinI(255, int(numArg(l, 5))))
+		}
+		ts.SetColor(int32(numArg(l, 2)), int32(numArg(l, 3)), int32(numArg(l, 4)), a)
 		return 0
 	})
 	luaRegister(l, "textImgSetFont", func(*lua.LState) int {
@@ -3388,6 +3392,10 @@ func triggerFunctions(l *lua.LState) {
 	luaRegister(l, "attack", func(*lua.LState) int {
 		base := float32(sys.debugWC.gi().attackBase) * sys.debugWC.ocd().attackRatio / 100
 		l.Push(lua.LNumber(base * sys.debugWC.attackMul[0] * 100))
+		return 1
+	})
+	luaRegister(l, "attackmul", func(*lua.LState) int {
+		l.Push(lua.LNumber(sys.debugWC.attackMul[0]))
 		return 1
 	})
 	luaRegister(l, "authorname", func(*lua.LState) int {
@@ -3839,6 +3847,10 @@ func triggerFunctions(l *lua.LState) {
 		l.Push(lua.LNumber(sys.debugWC.finalDefense * 100))
 		return 1
 	})
+	luaRegister(l, "defencemul", func(*lua.LState) int {
+		l.Push(lua.LNumber(float32(sys.debugWC.finalDefense / float64(sys.debugWC.gi().defenceBase) * 100)))
+		return 1
+	})
 	luaRegister(l, "drawgame", func(*lua.LState) int {
 		l.Push(lua.LBool(sys.debugWC.drawgame()))
 		return 1
@@ -4066,6 +4078,18 @@ func triggerFunctions(l *lua.LState) {
 			ln = lua.LNumber(c.ghv.hitshaketime)
 		case "hittime":
 			ln = lua.LNumber(c.ghv.hittime)
+		case "stand.friction":
+			sf := c.ghv.standfriction
+			if math.IsNaN(float64(sf)) {
+				sf = c.gi().movement.stand.friction
+			}
+			ln = lua.LNumber(sf)
+		case "crouch.friction":
+			cf := c.ghv.crouchfriction
+			if math.IsNaN(float64(cf)) {
+				cf = c.gi().movement.crouch.friction
+			}
+			ln = lua.LNumber(cf)
 		case "slidetime":
 			ln = lua.LNumber(c.ghv.slidetime)
 		case "ctrltime":
@@ -5306,14 +5330,18 @@ func triggerFunctions(l *lua.LState) {
 			l.Push(lua.LNumber(sys.stage.stageCamera.localcoord[0]))
 		case "stageinfo.localcoord.y":
 			l.Push(lua.LNumber(sys.stage.stageCamera.localcoord[1]))
-		case "stageinfo.zoffset":
-			l.Push(lua.LNumber(sys.stage.stageCamera.zoffset))
-		case "stageinfo.zoffsetlink":
-			l.Push(lua.LNumber(sys.stage.zoffsetlink))
+		case "stageinfo.autoturn":
+			l.Push(lua.LBool(sys.stage.autoturn))
+		case "stageinfo.resetbg":
+			l.Push(lua.LBool(sys.stage.resetbg))
 		case "stageinfo.xscale":
 			l.Push(lua.LNumber(sys.stage.scale[0]))
 		case "stageinfo.yscale":
 			l.Push(lua.LNumber(sys.stage.scale[1]))
+		case "stageinfo.zoffset":
+			l.Push(lua.LNumber(sys.stage.stageCamera.zoffset))
+		case "stageinfo.zoffsetlink":
+			l.Push(lua.LNumber(sys.stage.zoffsetlink))
 		case "shadow.intensity":
 			l.Push(lua.LNumber(sys.stage.sdw.intensity))
 		case "shadow.color.r":

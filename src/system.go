@@ -626,23 +626,27 @@ func (s *System) loadLocalcoords() {
 	s.resolveMotifPath()
 	s.resolveLifebarPath()
 
-	readLocalcoord := func(path string) [2]int32 {
+	readLocalcoord := func(path string) ([2]int32, bool) {
 		lines := loadLinesFromFile(path)
 		for i := 0; i < len(lines); {
 			is, name, _ := ReadIniSection(lines, &i)
 			if strings.ToLower(name) == "info" {
 				var lc [2]int32
 				if is.ReadI32("localcoord", &lc[0], &lc[1]) {
-					return lc
+					return lc, true
 				}
 			}
 		}
-		return [2]int32{320, 240}
+		return [2]int32{320, 240}, false
 	}
 	// Motif
-	s.luaLocalcoord = readLocalcoord(s.motifDef)
+	s.luaLocalcoord, _ = readLocalcoord(s.motifDef)
 	// Lifebar
-	s.lifebarLocalcoord = readLocalcoord(s.lifebarDef)
+	if lc, ok := readLocalcoord(s.lifebarDef); ok {
+		s.lifebarLocalcoord = lc
+	} else {
+		s.lifebarLocalcoord = s.luaLocalcoord
+	}
 }
 
 func getViewport(srcW, srcH, dstW, dstH int32) [4]int32 {
@@ -1872,10 +1876,6 @@ func (s *System) action() {
 	var x, y, scl float32 = s.cam.Pos[0], s.cam.Pos[1], s.cam.Scale / s.cam.BaseScale()
 	s.cam.ResetTracking()
 
-	// Update round state
-	// This is also reflected on characters (intros, win poses)
-	s.stepRoundState()
-
 	// Run "tick frame"
 	if s.tickFrame() {
 		// X axis player limits
@@ -1935,6 +1935,11 @@ func (s *System) action() {
 	// This function runs every tick
 	// It should be placed between "tick frame" and "tick next frame"
 	s.charUpdate()
+
+	// Update round state
+	// This is also reflected on characters (intros, win poses)
+	// It's important that this is placed after the tickFrame logic, or characters will not see every step of the sys.intro timer
+	s.stepRoundState()
 
 	// Update lifebars
 	// This must happen before hit detection for accurate display
@@ -2534,7 +2539,7 @@ func (s *System) drawDebugText() {
 		x := (320-float32(s.gameWidth))/2 + 1
 		y := 240 - float32(s.gameHeight)
 		if s.statusLFunc != nil {
-			s.debugFont.SetColor(255, 255, 255)
+			s.debugFont.SetColor(255, 255, 255, 255)
 			for i, p := range s.chars {
 				if len(p) > 0 {
 					top := s.luaLState.GetTop()
@@ -2551,7 +2556,7 @@ func (s *System) drawDebugText() {
 		}
 		// Console
 		y = MaxF(y, 48+240-float32(s.gameHeight))
-		s.debugFont.SetColor(255, 255, 255)
+		s.debugFont.SetColor(255, 255, 255, 255)
 		for _, s := range s.consoleText {
 			put(&x, &y, s)
 		}
@@ -2568,12 +2573,12 @@ func (s *System) drawDebugText() {
 		for i, f := range s.listLFunc {
 			if f != nil {
 				if i == 1 {
-					s.debugFont.SetColor(199, 199, 219)
+					s.debugFont.SetColor(199, 199, 219, 255)
 				} else if (i == 2 && s.debugWC.animPN != s.debugWC.playerNo) ||
 					(i == 3 && s.debugWC.ss.sb.playerNo != s.debugWC.playerNo) {
-					s.debugFont.SetColor(255, 255, 127)
+					s.debugFont.SetColor(255, 255, 127, 255)
 				} else {
-					s.debugFont.SetColor(255, 255, 255)
+					s.debugFont.SetColor(255, 255, 255, 255)
 				}
 				top := s.luaLState.GetTop()
 				if s.luaLState.CallByParam(lua.P{Fn: f, NRet: 1,
@@ -2591,7 +2596,7 @@ func (s *System) drawDebugText() {
 			}
 		}
 		// Clipboard
-		s.debugFont.SetColor(255, 255, 255)
+		s.debugFont.SetColor(255, 255, 255, 255)
 		for _, s := range s.debugWC.clipboardText {
 			put(&x, &y, s)
 		}
@@ -2600,7 +2605,7 @@ func (s *System) drawDebugText() {
 	// Unlike Mugen, this is drawn separately from the Clsn boxes themselves, making debug more flexible
 	//if s.clsnDisplay {
 	for _, t := range s.clsnText {
-		s.debugFont.SetColor(t.r, t.g, t.b)
+		s.debugFont.SetColor(t.r, t.g, t.b, t.a)
 		s.debugFont.fnt.Print(t.text, t.x, t.y, s.debugFont.xscl/s.widthScale,
 			s.debugFont.yscl/s.heightScale, 0, Rotation{0, 0, 0}, 0, 0, &s.scrrect,
 			s.debugFont.palfx, s.debugFont.frgba)
@@ -3223,18 +3228,19 @@ type Select struct {
 	selectedStageNo    int
 	charAnimPreload    []int32
 	stageAnimPreload   []int32
-	charSpritePreload  map[[2]int16]bool
-	stageSpritePreload map[[2]int16]bool
+	charSpritePreload  map[[2]uint16]bool
+	stageSpritePreload map[[2]uint16]bool
 	cdefOverwrite      map[int]string
 	sdefOverwrite      string
 	ocd                [3][]OverrideCharData
 }
 
 func newSelect() *Select {
-	return &Select{selectedStageNo: -1,
-		charSpritePreload: map[[2]int16]bool{[...]int16{9000, 0}: true,
-			[...]int16{9000, 1}: true}, stageSpritePreload: make(map[[2]int16]bool),
-		cdefOverwrite: make(map[int]string)}
+	return &Select{
+		selectedStageNo:    -1,
+		charSpritePreload:  map[[2]uint16]bool{[...]uint16{9000, 0}: true, [...]uint16{9000, 1}: true},
+		stageSpritePreload: make(map[[2]uint16]bool),
+		cdefOverwrite:      make(map[int]string)}
 }
 
 func (s *Select) GetCharNo(i int) int {
@@ -3561,7 +3567,7 @@ func (s *Select) addChar(defLine string) {
 			}
 		}
 	}
-	listSpr := make(map[[2]int16]bool)
+	listSpr := make(map[[2]uint16]bool)
 	for k := range s.charSpritePreload {
 		listSpr[k] = true
 	}
@@ -3602,7 +3608,10 @@ func (s *Select) addChar(defLine string) {
 				if animation := at.get(v_anim); animation != nil {
 					sc.anims.addAnim(animation, v_anim)
 					for _, fr := range animation.frames {
-						listSpr[[2]int16{fr.Group, fr.Number}] = true
+						if fr.Group < 0 || fr.Number < 0 {
+							continue
+						}
+						listSpr[[2]uint16{uint16(fr.Group), uint16(fr.Number)}] = true
 					}
 				}
 			}
@@ -3843,9 +3852,9 @@ func (s *Select) AddStage(def string) error {
 		}
 	}
 	if len(s.stageSpritePreload) > 0 || len(s.stageAnimPreload) > 0 {
-		listSpr := make(map[[2]int16]bool)
+		listSpr := make(map[[2]uint16]bool)
 		for k := range s.stageSpritePreload {
-			listSpr[[...]int16{k[0], k[1]}] = true
+			listSpr[[...]uint16{k[0], k[1]}] = true
 		}
 		sff := newSff()
 		// preload animations
@@ -3855,7 +3864,9 @@ func (s *Select) AddStage(def string) error {
 			if anim := at.get(v); anim != nil {
 				ss.anims.addAnim(anim, v)
 				for _, fr := range anim.frames {
-					listSpr[[...]int16{fr.Group, fr.Number}] = true
+					if fr.Group >= 0 && fr.Number >= 0 {
+						listSpr[[2]uint16{uint16(fr.Group), uint16(fr.Number)}] = true
+					}
 				}
 			}
 		}
@@ -4126,7 +4137,7 @@ func (l *Loader) loadCharacter(pn int, attached bool) int {
 			sys.lifebar.nm[sys.tmode[pn&1]][pn].numko = 0
 			for i, ci := range idx {
 				fa.teammate_scale[i] = sys.sel.charlist[ci].portrait_scale
-				fa.teammate_face[i] = sys.sel.charlist[ci].sff.GetSprite(int16(fa.teammate_face_spr[0]), int16(fa.teammate_face_spr[1]))
+				fa.teammate_face[i] = sys.sel.charlist[ci].sff.GetSprite(uint16(fa.teammate_face_spr[0]), uint16(fa.teammate_face_spr[1]))
 			}
 		}
 	}
@@ -4353,7 +4364,7 @@ func (es *EnvShake) next() {
 
 func (es *EnvShake) getOffset() [2]float32 {
 	if es.time > 0 {
-		offset := -(es.ampl * float32(math.Sin(float64(es.phase))))
+		offset := (es.ampl * float32(math.Sin(float64(es.phase))))
 		return [2]float32{offset * float32(math.Sin(float64(-es.dir))),
 			offset * float32(math.Cos(float64(-es.dir)))}
 	}

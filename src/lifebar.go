@@ -176,7 +176,7 @@ func loadFightFx(def string, isGlobal bool) error {
 }
 
 type LbText struct {
-	font       [6]int32
+	font       [8]int32 // to match Lua arg count regardless
 	text       string
 	lay        Layout
 	palfx      *PalFX
@@ -187,7 +187,7 @@ type LbText struct {
 
 func newLbText(align int32) *LbText {
 	return &LbText{
-		font:  [...]int32{-1, 0, align, 255, 255, 255},
+		font:  [...]int32{-1, 0, align, 255, 255, 255, 255, -1},
 		palfx: newPalFX(),
 		frgba: [...]float32{1.0, 1.0, 1.0, 1.0},
 	}
@@ -196,9 +196,9 @@ func newLbText(align int32) *LbText {
 func readLbText(pre string, is IniSection, str string, ln int16, f []*Fnt, align int32) *LbText {
 	txt := newLbText(align)
 
-	txt.font[3], txt.font[4], txt.font[5] = -1, -1, -1
+	txt.font[3], txt.font[4], txt.font[5], txt.font[6], txt.font[7] = -1, -1, -1, 255, -1
 	is.ReadI32(pre+"font", &txt.font[0], &txt.font[1], &txt.font[2],
-		&txt.font[3], &txt.font[4], &txt.font[5])
+		&txt.font[3], &txt.font[4], &txt.font[5], &txt.font[6], &txt.font[7])
 	if txt.font[0] >= 0 && int(txt.font[0]) < len(f) && f[txt.font[0]] == nil {
 		sys.errLog.Printf("Undefined font %v referenced by lifebar parameter: %v\n", txt.font[0], pre+"font")
 		txt.font[0] = -1
@@ -210,17 +210,17 @@ func readLbText(pre string, is IniSection, str string, ln int16, f []*Fnt, align
 	}
 	txt.lay = *ReadLayout(pre, is, ln)
 	if txt.font[3] >= 0 && txt.font[4] >= 0 && txt.font[5] >= 0 {
-		txt.SetColor(txt.font[3], txt.font[4], txt.font[5])
+		txt.SetColor(txt.font[3], txt.font[4], txt.font[5], txt.font[6])
 	}
 	txt.pfxinit = ReadPalFX(pre+"palfx.", is, txt.palfx)
 	return txt
 }
 
-func (txt *LbText) SetColor(r, g, b int32) {
+func (txt *LbText) SetColor(r, g, b, a int32) {
 	txt.forcecolor = true
 	txt.palfx.setColor(r, g, b)
 	txt.frgba = [...]float32{float32(r) / 255, float32(g) / 255,
-		float32(b) / 255, 1.0}
+		float32(b) / 255, float32(a) / 255}
 }
 
 func (txt *LbText) step() {
@@ -1639,7 +1639,7 @@ func readLifeBarFace(pre string, is IniSection, sff *Sff, at AnimationTable) *Li
 	is.ReadI32(pre+"teammate.face.spr", &fa.teammate_face_spr[0],
 		&fa.teammate_face_spr[1])
 	if fa.teammate_face_spr[0] != -1 {
-		sys.sel.charSpritePreload[[...]int16{int16(fa.teammate_face_spr[0]), int16(fa.teammate_face_spr[1])}] = true
+		sys.sel.charSpritePreload[[...]uint16{uint16(fa.teammate_face_spr[0]), uint16(fa.teammate_face_spr[1])}] = true
 	}
 	fa.teammate_face_lay = *ReadLayout(pre+"teammate.face.", is, 0)
 	is.ReadBool(pre+"teammate.ko.hide", &fa.teammate_ko_hide)
@@ -1649,7 +1649,7 @@ func readLifeBarFace(pre string, is IniSection, sff *Sff, at AnimationTable) *Li
 
 func (fa *LifeBarFace) step(ref int, far *LifeBarFace) {
 	refChar := sys.chars[ref][0]
-	group, number := int16(fa.face_spr[0]), int16(fa.face_spr[1])
+	group, number := fa.face_spr[0], fa.face_spr[1]
 	if refChar != nil && refChar.anim != nil {
 		if mg, ok := refChar.anim.remap[group]; ok {
 			if mn, ok := mg[number]; ok {
@@ -1657,10 +1657,10 @@ func (fa *LifeBarFace) step(ref int, far *LifeBarFace) {
 			}
 		}
 	}
-	if far.old_spr[0] != int32(group) || far.old_spr[1] != int32(number) ||
+	if far.old_spr[0] != group || far.old_spr[1] != number ||
 		far.old_pal[0] != sys.cgi[ref].remappedpal[0] || far.old_pal[1] != sys.cgi[ref].remappedpal[1] {
-		far.face = sys.cgi[ref].sff.getOwnPalSprite(group, number, &sys.cgi[ref].palettedata.palList)
-		far.old_spr = [...]int32{int32(group), int32(number)}
+		far.face = sys.cgi[ref].sff.getOwnPalSprite(uint16(group), uint16(number), &sys.cgi[ref].palettedata.palList)
+		far.old_spr = [...]int32{group, number}
 		far.old_pal = [...]int32{sys.cgi[ref].remappedpal[0], sys.cgi[ref].remappedpal[1]}
 	}
 	fa.bg.Action()

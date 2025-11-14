@@ -171,9 +171,9 @@ const (
 
 // Debug Clsn text
 type ClsnText struct {
-	x, y    float32
-	text    string
-	r, g, b int32
+	x, y       float32
+	text       string
+	r, g, b, a int32
 }
 
 // Debug Clsn display
@@ -652,8 +652,8 @@ type HitDef struct {
 	p2clsnrequire              int32
 	attack_depth               [2]float32
 	unhittabletime             [2]int32
-	P2StandFriction            float32
-	P2CrouchFriction           float32
+	StandFriction              float32
+	CrouchFriction             float32
 	KeepState                  bool
 	MissOnReversalDef          int32
 }
@@ -770,8 +770,8 @@ func (hd *HitDef) clear(c *Char, localscl float32) {
 		fall_envshake_dir:   0.0,
 		attack_depth:        [2]float32{c.size.attack.depth[0], c.size.attack.depth[1]},
 		unhittabletime:      [2]int32{IErr, IErr},
-		P2StandFriction:     float32(math.NaN()),
-		P2CrouchFriction:    float32(math.NaN()),
+		StandFriction:       float32(math.NaN()),
+		CrouchFriction:      float32(math.NaN()),
 		KeepState:           false,
 		MissOnReversalDef:   0,
 
@@ -879,8 +879,8 @@ type GetHitVar struct {
 	down_recovertime    int32
 	guardflag           int32
 	keepstate           bool
-	p2standfriction     float32
-	p2crouchfriction    float32
+	standfriction       float32
+	crouchfriction      float32
 }
 
 func (ghv *GetHitVar) clear(c *Char) {
@@ -893,20 +893,20 @@ func (ghv *GetHitVar) clear(c *Char) {
 	}
 
 	*ghv = GetHitVar{
-		hittime:          -1,
-		yaccel:           0.35 / originLs,
-		xoff:             ghv.xoff,
-		yoff:             ghv.yoff,
-		zoff:             ghv.zoff,
-		hitid:            -1,
-		playerNo:         -1,
-		fall_animtype:    RA_Unknown,
-		fall_xvelocity:   float32(math.NaN()),
-		fall_yvelocity:   -4.5 / originLs,
-		fall_zvelocity:   float32(math.NaN()),
-		keepstate:        false,
-		p2standfriction:  float32(math.NaN()),
-		p2crouchfriction: float32(math.NaN()),
+		hittime:        -1,
+		yaccel:         0.35 / originLs,
+		xoff:           ghv.xoff,
+		yoff:           ghv.yoff,
+		zoff:           ghv.zoff,
+		hitid:          -1,
+		playerNo:       -1,
+		fall_animtype:  RA_Unknown,
+		fall_xvelocity: float32(math.NaN()),
+		fall_yvelocity: -4.5 / originLs,
+		fall_zvelocity: float32(math.NaN()),
+		keepstate:      false,
+		standfriction:  float32(math.NaN()),
+		crouchfriction: float32(math.NaN()),
 	}
 }
 
@@ -1243,7 +1243,7 @@ func (ai *AfterImage) recAfterImg(sd *SprData, hitpause bool) {
 	ai.timecount++
 }
 
-func (ai *AfterImage) recAndCue(sd *SprData, rec bool, hitpause bool, layer int32) {
+func (ai *AfterImage) recAndCue(sd *SprData, rec bool, hitpause bool, layer int32, screen_space bool) {
 	if ai.time == 0 || (ai.timecount >= ai.timegap*ai.length+ai.time-1 && ai.time > 0) ||
 		ai.timegap < 1 || ai.timegap > 32767 ||
 		ai.framegap < 1 || ai.framegap > 32767 {
@@ -1280,7 +1280,7 @@ func (ai *AfterImage) recAndCue(sd *SprData, rec bool, hitpause bool, layer int3
 				alpha:        ai.alpha,
 				priority:     img.priority - step, // Afterimages decrease in sprpriority over time
 				rot:          img.rot,
-				screen:       false,
+				screen:       screen_space,
 				undarken:     sd.undarken,
 				facing:       sd.facing,
 				airOffsetFix: sd.airOffsetFix,
@@ -1350,6 +1350,7 @@ type Explod struct {
 	palfx               *PalFX
 	palfxdef            PalFXDef
 	window              [4]float32
+	syncParams          bool
 	syncLayer           int32
 	syncId              int32
 	aimg                AfterImage
@@ -1407,6 +1408,7 @@ func (e *Explod) initFromChar(c *Char) *Explod {
 		alpha:             [2]int32{-1, 0},
 		bindId:            -2,
 		syncId:            -1,
+		syncParams:        true,
 		syncLayer:         0,
 		ignorehitpause:    true,
 		interpolate_scale: [4]float32{1, 1, 0, 0},
@@ -1659,8 +1661,8 @@ func (e *Explod) update(playerNo int) {
 			e.pos[i] = e.newPos[i] - (e.newPos[i]-e.oldPos[i])*(1-spd)
 		}
 	}
-	if e.syncId >= 0 {
-		if syncChar := sys.playerID(e.syncId); syncChar != nil {
+	if e.syncId > 0 {
+		if syncChar := sys.playerID(e.syncId); syncChar != nil && e.syncParams {
 			e.sprpriority = syncChar.sprPriority
 			e.scale = [2]float32{syncChar.size.xscale * syncChar.angleDrawScale[0], syncChar.size.yscale * syncChar.angleDrawScale[1]}
 			if syncChar.csf(CSF_angledraw) {
@@ -1668,7 +1670,15 @@ func (e *Explod) update(playerNo int) {
 			} else {
 				e.anglerot = [3]float32{0, 0, 0}
 			}
+			e.window = syncChar.window
+			e.xshear = syncChar.xshear
+			e.projection = syncChar.projection
+			e.fLength = syncChar.fLength
+
 			e.trans = syncChar.trans
+			e.alpha = syncChar.alpha
+			e.palfx = syncChar.getPalfx()
+			e.facing = syncChar.facing
 			if syncChar.aimg.time != 0 {
 				// Copy Afterimage settings, but not the state
 				e.aimg.time = syncChar.aimg.time
@@ -1686,9 +1696,6 @@ func (e *Explod) update(playerNo int) {
 				e.aimg.ignorehitpause = syncChar.aimg.ignorehitpause
 				e.aimg.palfx[0] = syncChar.aimg.palfx[0] // Settings are in the first element
 			}
-			e.alpha = syncChar.alpha
-			e.palfx = syncChar.getPalfx()
-			e.facing = syncChar.facing
 		}
 	}
 	off := e.relativePos
@@ -1808,23 +1815,25 @@ func (e *Explod) update(playerNo int) {
 		window:       ewin,
 		xshear:       xshear,
 	}
-	if e.syncId >= 0 {
+	if e.syncId > 0 {
 		sd.syncId = e.syncId
 		sd.syncLayer = e.syncLayer
 	}
 	// Record afterimage
-	e.aimg.recAndCue(sd, sys.tickNextFrame() && act, sys.tickNextFrame() && e.ignorehitpause && (e.supermovetime != 0 || e.pausemovetime != 0), e.layerno)
+	e.aimg.recAndCue(sd, sys.tickNextFrame() && act, sys.tickNextFrame() && e.ignorehitpause && (e.supermovetime != 0 || e.pausemovetime != 0), e.layerno, e.space == Space_screen)
 
 	sprs.add(sd)
 
 	// Add shadow if color is not 0
 	sdwclr := e.shadow[0]<<16 | e.shadow[1]&0xff<<8 | e.shadow[2]&0xff
+
 	if sdwclr != 0 {
 		sdwalp := 255 - alp[1]
 		if sdwalp < 0 {
 			sdwalp = 256
 		}
 		drawZoff := sys.posZtoYoffset(e.interPos[2], e.localscl)
+
 		// Add shadow sprite
 		sys.shadows.add(&ShadowSprite{
 			SprData:      sd,
@@ -1833,6 +1842,7 @@ func (e *Explod) update(playerNo int) {
 			shadowOffset: [2]float32{0, sys.stage.sdw.yscale*drawZoff + drawZoff},
 			groundLevel:  drawZoff,
 		})
+
 		// Add reflection sprite
 		sys.reflections.add(&ReflectionSprite{
 			SprData:       sd,
@@ -1840,6 +1850,7 @@ func (e *Explod) update(playerNo int) {
 			groundLevel:   drawZoff,
 		})
 	}
+
 	if sys.tickNextFrame() {
 
 		//if e.space == Space_screen && e.bindtime == 0 {
@@ -2477,12 +2488,16 @@ func (p *Projectile) cueDraw() {
 			window:       pwin,
 			xshear:       p.xshear,
 		}
-		p.aimg.recAndCue(sd, sys.tickNextFrame() && notpause, false, p.layerno)
+
+		p.aimg.recAndCue(sd, sys.tickNextFrame() && notpause, false, p.layerno, false)
 		sprs.add(sd)
+
 		// Add a shadow if color is not 0
 		sdwclr := p.shadow[0]<<16 | p.shadow[1]&0xff<<8 | p.shadow[2]&0xff
+
 		if sdwclr != 0 {
 			drawZoff := sys.posZtoYoffset(p.interPos[2], p.localscl)
+
 			// Add shadow
 			sys.shadows.add(&ShadowSprite{
 				SprData:      sd,
@@ -2491,6 +2506,7 @@ func (p *Projectile) cueDraw() {
 				shadowOffset: [2]float32{0, sys.stage.sdw.yscale*drawZoff + drawZoff},
 				groundLevel:  drawZoff,
 			})
+
 			// Add reflection
 			sys.reflections.add(&ReflectionSprite{
 				SprData:       sd,
@@ -2798,6 +2814,7 @@ type Char struct {
 	shadowIntensity   int32
 	shadowOffset      [2]float32
 	shadowWindow      [4]float32
+	shadowXscale      float32
 	shadowXshear      float32
 	shadowYscale      float32
 	shadowRot         Rotation
@@ -2808,6 +2825,7 @@ type Char struct {
 	reflectIntensity  int32
 	reflectOffset     [2]float32
 	reflectWindow     [4]float32
+	reflectXscale     float32
 	reflectXshear     float32
 	reflectYscale     float32
 	reflectRot        Rotation
@@ -2817,6 +2835,8 @@ type Char struct {
 	pushPriority      int32
 	prevfallflag      bool
 	makeDustSpacing   int
+	hitStateChangeIdx int32
+	currentSctrlIndex int32
 	//dustOldPos        [3]float32
 }
 
@@ -2907,6 +2927,7 @@ func (c *Char) clearState() {
 	c.hitdefContact = false
 	c.fallTime = 0
 	c.makeDustSpacing = 0
+	c.hitStateChangeIdx = -1
 }
 
 func (c *Char) clsnOverlapTrigger(box1, pid, box2 int32) bool {
@@ -3616,10 +3637,12 @@ func (c *Char) load(def string) error {
 							if len(k) == 2 {
 								var v [2]int32
 								is.ReadI32(key, &v[0], &v[1])
-								if _, ok := gi.remapPreset[subname][int16(Atoi(k[0]))]; !ok {
-									gi.remapPreset[subname][int16(Atoi(k[0]))] = make(RemapTable)
+								g0 := int32(Atoi(k[0]))
+								n0 := int32(Atoi(k[1]))
+								if _, ok := gi.remapPreset[subname][g0]; !ok {
+									gi.remapPreset[subname][g0] = make(RemapTable)
 								}
-								gi.remapPreset[subname][int16(Atoi(k[0]))][int16(Atoi(k[1]))] = [...]int16{int16(v[0]), int16(v[1])}
+								gi.remapPreset[subname][g0][n0] = v
 							}
 						}
 					}
@@ -3647,8 +3670,8 @@ func (c *Char) load(def string) error {
 	gi.palettedata.palList = PaletteList{
 		palettes:   append([][]uint32{}, gi.sff.palList.palettes...),
 		paletteMap: append([]int{}, gi.sff.palList.paletteMap...),
-		PalTable:   make(map[[2]int16]int),
-		numcols:    make(map[[2]int16]int),
+		PalTable:   make(map[[2]uint16]int),
+		numcols:    make(map[[2]uint16]int),
 		PalTex:     append([]Texture{}, gi.sff.palList.PalTex...),
 	}
 	for key, value := range gi.sff.palList.PalTable {
@@ -3781,17 +3804,17 @@ func (c *Char) loadPalette() {
 				pal.exists = false
 				gi.palInfo[i] = pal
 				if i > 0 {
-					delete(gi.palettedata.palList.PalTable, [...]int16{1, int16(i + 1)})
+					delete(gi.palettedata.palList.PalTable, [...]uint16{1, uint16(i + 1)})
 				}
 			}
 		}
 		if tmp == 0 {
-			delete(gi.palettedata.palList.PalTable, [...]int16{1, 1})
+			delete(gi.palettedata.palList.PalTable, [...]uint16{1, 1})
 		}
 	} else {
 		for i := 0; i < maxPal; i++ {
 			pal := gi.palInfo[i]
-			_, pal.exists = gi.palettedata.palList.PalTable[[...]int16{1, int16(i + 1)}]
+			_, pal.exists = gi.palettedata.palList.PalTable[[...]uint16{1, uint16(i + 1)}]
 			gi.palInfo[i] = pal
 		}
 		if gi.sff.header.NumberOfPalettes > 0 {
@@ -5761,6 +5784,14 @@ func (c *Char) stateChange1(no int32, pn int) bool {
 		sys.errLog.Printf("Maximum ChangeState loops: %v, %v, %v -> %v -> %v\n", sys.changeStateNest, c.name, c.ss.prevno, c.ss.no, no)
 		return false
 	}
+	var ctrlsps_backup []int32
+	if c.hitPause() {
+		// If in hitpause, back up the current state's persistent.
+		ctrlsps_backup = make([]int32, len(c.ss.sb.ctrlsps))
+		copy(ctrlsps_backup, c.ss.sb.ctrlsps)
+	} else {
+		ctrlsps_backup = nil
+	}
 
 	c.ss.prevno = c.ss.no
 	c.ss.no = Max(0, no)
@@ -5840,6 +5871,20 @@ func (c *Char) stateChange1(no int32, pn int) bool {
 	// Ikemenver chars aren't affected by this.
 	if c.stWgi().ikemenver[0] != 0 || c.stWgi().ikemenver[1] != 0 {
 		c.ss.sb.ctrlsps = make([]int32, len(c.ss.sb.ctrlsps))
+	} else {
+		// Reset persistent counters for this state (MUGEN chars)
+		if c.hitPause() && ctrlsps_backup != nil {
+			// If changing state during hitpause, restore (carry over) persistent from the before state
+			c.ss.sb.ctrlsps = make([]int32, len(c.ss.sb.ctrlsps))
+			copy(c.ss.sb.ctrlsps, ctrlsps_backup)
+
+			// Get the index of the currently executing SCTRL block
+			c.hitStateChangeIdx = c.currentSctrlIndex
+		} else {
+			// If not in hitpause, reset persistent
+			c.ss.sb.ctrlsps = make([]int32, len(c.ss.sb.ctrlsps))
+			c.hitStateChangeIdx = -1
+		}
 	}
 	c.stchtmp = true
 	return true
@@ -5848,10 +5893,6 @@ func (c *Char) stateChange1(no int32, pn int) bool {
 func (c *Char) stateChange2() bool {
 	if c.stchtmp && !c.hitPause() {
 		c.ss.sb.init(c)
-		// Reset persistent counters for this state (MUGEN chars)
-		if c.stWgi().ikemenver[0] == 0 && c.stWgi().ikemenver[1] == 0 {
-			c.ss.sb.ctrlsps = make([]int32, len(c.ss.sb.ctrlsps))
-		}
 		// Flag RemoveOnChangeState explods for removal
 		for i := range sys.explods[c.playerNo] {
 			if sys.explods[c.playerNo][i].playerId == c.id && sys.explods[c.playerNo][i].removeonchangestate {
@@ -6396,11 +6437,11 @@ func (c *Char) animSpriteSetup(a *Animation, spritePN int, ffx string, ownpal bo
 			// Remap palette to sprite owner's current palette if allowed
 			if ownpal {
 				ownerPal := owner.drawPal()
-				key := [2]int16{int16(ownerPal[0]), int16(ownerPal[1])}
+				key := [2]uint16{uint16(ownerPal[0]), uint16(ownerPal[1])}
 
 				if di, ok := a.palettedata.PalTable[key]; ok {
 					for _, id := range [...]int32{0, 9000} {
-						if spr := a.sff.GetSprite(int16(id), 0); spr != nil {
+						if spr := a.sff.GetSprite(uint16(id), 0); spr != nil {
 							a.palettedata.Remap(spr.palidx, di)
 						}
 					}
@@ -8286,12 +8327,12 @@ func (c *Char) remapPal(pfx *PalFX, src [2]int32, dst [2]int32) {
 	plist := c.gi().palettedata.palList
 
 	// Look up source and destination palettes
-	si, ok := plist.PalTable[[...]int16{int16(src[0]), int16(src[1])}]
+	si, ok := plist.PalTable[[...]uint16{uint16(src[0]), uint16(src[1])}]
 	if !ok || si < 0 {
 		sys.appendToConsole(c.warn() + fmt.Sprintf("has no source palette for RemapPal: %v,%v", src[0], src[1]))
 		return
 	}
-	di, ok := plist.PalTable[[...]int16{int16(dst[0]), int16(dst[1])}]
+	di, ok := plist.PalTable[[...]uint16{uint16(dst[0]), uint16(dst[1])}]
 	if !ok || di < 0 {
 		sys.appendToConsole(c.warn() + fmt.Sprintf("has no dest palette for RemapPal: %v,%v", dst[0], dst[1]))
 		return
@@ -8329,7 +8370,7 @@ func (c *Char) forceRemapPal(pfx *PalFX, dst [2]int32) {
 	}
 
 	// Get new palette
-	di, ok := c.gi().palettedata.palList.PalTable[[...]int16{int16(dst[0]), int16(dst[1])}]
+	di, ok := c.gi().palettedata.palList.PalTable[[...]uint16{uint16(dst[0]), uint16(dst[1])}]
 	if !ok || di < 0 {
 		return
 	}
@@ -8360,24 +8401,24 @@ func (c *Char) drawPal() [2]int32 {
 	return c.getDrawPal(palMap[0])
 }
 
-type RemapTable map[int16][2]int16
-type RemapPreset map[int16]RemapTable
+type RemapTable map[int32][2]int32
+type RemapPreset map[int32]RemapTable
 
-func (c *Char) remapSprite(src [2]int16, dst [2]int16) {
-	if src[0] < 0 || src[1] < 0 || dst[0] < 0 || dst[1] < 0 {
+func (c *Char) remapSprite(src [2]int32, dst [2]int32) {
+	if src[0] == -1 || src[1] == -1 || dst[0] == -1 || dst[1] == -1 {
 		return
 	}
 	if _, ok := c.remapSpr[src[0]]; !ok {
 		c.remapSpr[src[0]] = make(RemapTable)
 	}
-	c.remapSpr[src[0]][src[1]] = [...]int16{dst[0], dst[1]}
+	c.remapSpr[src[0]][src[1]] = [...]int32{dst[0], dst[1]}
 }
 
 func (c *Char) remapSpritePreset(preset string) {
 	if _, ok := c.gi().remapPreset[preset]; !ok {
 		return
 	}
-	var src, dst [2]int16
+	var src, dst [2]int32
 	for src[0] = range c.gi().remapPreset[preset] {
 		for src[1], dst = range c.gi().remapPreset[preset][src[0]] {
 			c.remapSprite(src, dst)
@@ -8643,8 +8684,8 @@ func (c *Char) posUpdate() {
 	switch c.ss.physics {
 	case ST_S:
 		standFriction := c.gi().movement.stand.friction
-		if !math.IsNaN(float64(c.ghv.p2standfriction)) {
-			standFriction = c.ghv.p2standfriction
+		if !math.IsNaN(float64(c.ghv.standfriction)) {
+			standFriction = c.ghv.standfriction
 		}
 		c.vel[0] *= standFriction
 		if AbsF(c.vel[0]) < 1/originLs { // TODO: These probably shouldn't be hardcoded
@@ -8656,8 +8697,8 @@ func (c *Char) posUpdate() {
 		}
 	case ST_C:
 		crouchFriction := c.gi().movement.crouch.friction
-		if !math.IsNaN(float64(c.ghv.p2crouchfriction)) {
-			crouchFriction = c.ghv.p2crouchfriction
+		if !math.IsNaN(float64(c.ghv.crouchfriction)) {
+			crouchFriction = c.ghv.crouchfriction
 		}
 		c.vel[0] *= crouchFriction
 		c.vel[2] *= crouchFriction
@@ -10067,8 +10108,8 @@ func (c *Char) hitResultCheck(getter *Char, proj *Projectile) (hitResult int32) 
 		getter.ghv.frame = true
 
 		// P2 Friction
-		getter.ghv.p2standfriction = hd.P2StandFriction
-		getter.ghv.p2crouchfriction = hd.P2CrouchFriction
+		getter.ghv.standfriction = hd.StandFriction
+		getter.ghv.crouchfriction = hd.CrouchFriction
 
 		// In Mugen, having any HitOverride active allows GetHitVar Damage to exceed the remaining life
 		bnd := true
@@ -10580,6 +10621,7 @@ func (c *Char) actionPrepare() {
 		c.shadowIntensity = -1
 		c.shadowOffset = [2]float32{}
 		c.shadowWindow = [4]float32{}
+		c.shadowXscale = 0
 		c.shadowXshear = 0
 		c.shadowYscale = 0
 		c.shadowRot = Rotation{0, 0, 0}
@@ -10591,6 +10633,7 @@ func (c *Char) actionPrepare() {
 		c.reflectIntensity = -1
 		c.reflectOffset = [2]float32{}
 		c.reflectWindow = [4]float32{}
+		c.reflectXscale = 0
 		c.reflectXshear = 0
 		c.reflectYscale = 0
 		c.reflectRot = Rotation{0, 0, 0}
@@ -11256,6 +11299,16 @@ func (c *Char) tick() {
 			c.hitPauseTime--
 			if c.hitPauseTime == 0 {
 				c.ss.clearHitPauseExecutionToggleFlags()
+				//Having a hitStateChangeIdx means that ChangeState was performed during the hitpause
+				if c.hitStateChangeIdx != -1 {
+					// For Mugen compatibility, the persistent is reset when the hitpause ends during ChangeState
+					if c.stWgi().ikemenver[0] == 0 && c.stWgi().ikemenver[1] == 0 {
+						for i := range c.ss.sb.ctrlsps {
+							c.ss.sb.ctrlsps[i] = 0
+						}
+					}
+					c.hitStateChangeIdx = -1
+				}
 			}
 		}
 		// Fast recovery from lie down
@@ -11453,18 +11506,18 @@ func (c *Char) cueDebugDraw() {
 		y = (y*sys.cam.Scale - sys.cam.Pos[1]) + sys.cam.GroundLevel() + 1 // "1" is just for spacing
 		y += float32(sys.debugFont.fnt.Size[1]) * sys.debugFont.yscl / sys.heightScale
 		// Name and ID
-		sys.clsnText = append(sys.clsnText, ClsnText{x: x, y: y, text: fmt.Sprintf("%s, %d", c.name, c.id), r: 255, g: 255, b: 255})
+		sys.clsnText = append(sys.clsnText, ClsnText{x: x, y: y, text: fmt.Sprintf("%s, %d", c.name, c.id), r: 255, g: 255, b: 255, a: 255})
 		// NotHitBy
 		if nhbtxt != "" {
 			y += float32(sys.debugFont.fnt.Size[1]) * sys.debugFont.yscl / sys.heightScale
-			sys.clsnText = append(sys.clsnText, ClsnText{x: x, y: y, text: fmt.Sprintf(nhbtxt), r: 191, g: 255, b: 255})
+			sys.clsnText = append(sys.clsnText, ClsnText{x: x, y: y, text: fmt.Sprintf(nhbtxt), r: 191, g: 255, b: 255, a: 255})
 		}
 		// Targets
 		for _, tid := range c.targets {
 			if t := sys.playerID(tid); t != nil {
 				y += float32(sys.debugFont.fnt.Size[1]) * sys.debugFont.yscl / sys.heightScale
 				jg := t.ghv.getJuggle(c.id, c.gi().data.airjuggle)
-				sys.clsnText = append(sys.clsnText, ClsnText{x: x, y: y, text: fmt.Sprintf("Target %d: %d", tid, jg), r: 255, g: 191, b: 255})
+				sys.clsnText = append(sys.clsnText, ClsnText{x: x, y: y, text: fmt.Sprintf("Target %d: %d", tid, jg), r: 255, g: 191, b: 255, a: 255})
 			}
 		}
 	}
@@ -11575,7 +11628,7 @@ func (c *Char) cueDraw() {
 		charSD.syncLayer = 0 // Character body is always at layer 0
 
 		// Record afterimage
-		c.aimg.recAndCue(charSD, rec, sys.tickNextFrame() && c.hitPause(), c.layerNo)
+		c.aimg.recAndCue(charSD, rec, sys.tickNextFrame() && c.hitPause(), c.layerNo, false)
 		// Hitshake effect
 		if c.ghv.hitshaketime > 0 && c.ss.time&1 != 0 {
 			charSD.pos[0] -= c.facing
@@ -11615,19 +11668,22 @@ func (c *Char) cueDraw() {
 				//if charSD.oldVer {
 				//	soy *= 1.5
 				//}
+
 				// Mugen uses some odd math for the shadow offset here, factoring in the stage's shadow scale
 				// Meaning the character's shadow offset constant is unable to offset it correctly in every stage
 				// Ikemen works differently and as you'd expect it to
 				drawZoff := sys.posZtoYoffset(c.interPos[2], c.localscl)
-				// Gets the Yscale defined by ModifyShadow/Reflection or keeps the one from the stage
-				getYscale := func(char, stage float32) float32 {
-					if char != 0 {
-						return char
-					}
-					return stage
+
+				// Get the Yscale defined by ModifyShadow/Reflection or keep the one from the stage
+				sdwYscale := sys.stage.sdw.yscale
+				if c.shadowYscale != 0 {
+					sdwYscale = c.shadowYscale
 				}
-				sdwYscale := getYscale(c.shadowYscale, sys.stage.sdw.yscale)
-				refYscale := getYscale(c.reflectYscale, sys.stage.reflection.yscale)
+
+				refYscale := sys.stage.reflection.yscale
+				if c.reflectYscale != 0 {
+					refYscale = c.reflectYscale
+				}
 
 				// Add shadow to shadow list
 				sys.shadows.add(&ShadowSprite{
@@ -11640,6 +11696,7 @@ func (c *Char) cueDraw() {
 						(c.size.shadowoffset+c.shadowOffset[1])*c.localscl + sdwYscale*drawZoff + drawZoff,
 					},
 					shadowWindow:     c.shadowWindow,
+					shadowXscale:     c.shadowXscale,
 					shadowXshear:     c.shadowXshear,
 					shadowYscale:     c.shadowYscale,
 					shadowRot:        c.shadowRot,
@@ -11657,6 +11714,7 @@ func (c *Char) cueDraw() {
 					reflectSDcopy.anim = c.reflectAnim
 					reflectSD = &reflectSDcopy
 				}
+
 				// Reflection modifiers
 				reflectclr := c.reflectColor[0]<<16 | c.reflectColor[1]<<8 | c.reflectColor[2]
 
@@ -11670,6 +11728,7 @@ func (c *Char) cueDraw() {
 						(c.size.shadowoffset+c.reflectOffset[1])*c.localscl + refYscale*drawZoff + drawZoff,
 					},
 					reflectWindow:     c.reflectWindow,
+					reflectXscale:     c.reflectXscale,
 					reflectXshear:     c.reflectXshear,
 					reflectYscale:     c.reflectYscale,
 					reflectRot:        c.reflectRot,

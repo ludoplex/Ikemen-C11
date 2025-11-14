@@ -883,6 +883,10 @@ func (c *Compiler) explodSub(is IniSection,
 		explod_synclayer, VT_Int, 1, false); err != nil {
 		return err
 	}
+	if err := c.paramValue(is, sc, "syncparams",
+		explod_syncparams, VT_Bool, 1, false); err != nil {
+		return err
+	}
 	if err := c.paramValue(is, sc, "syncid",
 		explod_syncid, VT_Int, 1, false); err != nil {
 		return err
@@ -1267,6 +1271,14 @@ func (c *Compiler) modifyShadow(is IniSection, sc *StateControllerBase, _ int8) 
 			modifyShadow_redirectid, VT_Int, 1, false); err != nil {
 			return err
 		}
+		if err := c.paramValue(is, sc, "animplayerno",
+			modifyShadow_animplayerno, VT_Int, 1, false); err != nil {
+			return err
+		}
+		if err := c.paramValue(is, sc, "spriteplayerno",
+			modifyShadow_spriteplayerno, VT_Int, 1, false); err != nil {
+			return err
+		}
 		if err := c.stateParam(is, "anim", false, func(data string) error {
 			prefix := c.getDataPrefix(&data, false)
 			return c.scAdd(sc, modifyShadow_anim, data, VT_Int, 1,
@@ -1288,6 +1300,10 @@ func (c *Compiler) modifyShadow(is IniSection, sc *StateControllerBase, _ int8) 
 		}
 		if err := c.paramValue(is, sc, "window",
 			modifyShadow_window, VT_Float, 4, false); err != nil {
+			return err
+		}
+		if err := c.paramValue(is, sc, "xscale",
+			modifyShadow_xscale, VT_Float, 1, false); err != nil {
 			return err
 		}
 		if err := c.paramValue(is, sc, "xshear",
@@ -1329,6 +1345,14 @@ func (c *Compiler) modifyReflection(is IniSection, sc *StateControllerBase, _ in
 			modifyReflection_redirectid, VT_Int, 1, false); err != nil {
 			return err
 		}
+		if err := c.paramValue(is, sc, "animplayerno",
+			modifyReflection_animplayerno, VT_Int, 1, false); err != nil {
+			return err
+		}
+		if err := c.paramValue(is, sc, "spriteplayerno",
+			modifyReflection_spriteplayerno, VT_Int, 1, false); err != nil {
+			return err
+		}
 		if err := c.stateParam(is, "anim", false, func(data string) error {
 			prefix := c.getDataPrefix(&data, false)
 			return c.scAdd(sc, modifyReflection_anim, data, VT_Int, 1,
@@ -1350,6 +1374,10 @@ func (c *Compiler) modifyReflection(is IniSection, sc *StateControllerBase, _ in
 		}
 		if err := c.paramValue(is, sc, "window",
 			modifyReflection_window, VT_Float, 4, false); err != nil {
+			return err
+		}
+		if err := c.paramValue(is, sc, "xscale",
+			modifyReflection_xscale, VT_Float, 1, false); err != nil {
 			return err
 		}
 		if err := c.paramValue(is, sc, "xshear",
@@ -2201,12 +2229,12 @@ func (c *Compiler) hitDefSub(is IniSection, sc *StateControllerBase) error {
 		hitDef_unhittabletime, VT_Int, 2, false); err != nil {
 		return err
 	}
-	if err := c.paramValue(is, sc, "p2stand.friction",
-		hitDef_p2stand_friction, VT_Float, 1, false); err != nil {
+	if err := c.paramValue(is, sc, "stand.friction",
+		hitDef_stand_friction, VT_Float, 1, false); err != nil {
 		return err
 	}
-	if err := c.paramValue(is, sc, "p2crouch.friction",
-		hitDef_p2crouch_friction, VT_Float, 1, false); err != nil {
+	if err := c.paramValue(is, sc, "crouch.friction",
+		hitDef_crouch_friction, VT_Float, 1, false); err != nil {
 		return err
 	}
 	if err := c.paramValue(is, sc, "missonreversaldef",
@@ -5422,7 +5450,7 @@ func (c *Compiler) text(is IniSection, sc *StateControllerBase, _ int8) (StateCo
 			return err
 		}
 		if err := c.paramValue(is, sc, "color",
-			text_color, VT_Int, 3, false); err != nil {
+			text_color, VT_Int, 4, false); err != nil {
 			return err
 		}
 		if err := c.paramValue(is, sc, "xshear",
@@ -5541,7 +5569,7 @@ func (c *Compiler) modifyText(is IniSection, sc *StateControllerBase, _ int8) (S
 			return err
 		}
 		if err := c.paramValue(is, sc, "color",
-			text_color, VT_Int, 3, false); err != nil {
+			text_color, VT_Int, 4, false); err != nil {
 			return err
 		}
 		if err := c.paramValue(is, sc, "xshear",
@@ -5816,12 +5844,12 @@ func (c *Compiler) modifyStageVar(is IniSection, sc *StateControllerBase, _ int8
 			modifyStageVar_bound_screenright, VT_Int, 1, false); err != nil {
 			return err
 		}
-		if err := c.paramValue(is, sc, "stageinfo.zoffset",
-			modifyStageVar_stageinfo_zoffset, VT_Int, 1, false); err != nil {
+		if err := c.paramValue(is, sc, "stageinfo.autoturn",
+			modifyStageVar_stageinfo_autoturn, VT_Bool, 1, false); err != nil {
 			return err
 		}
-		if err := c.paramValue(is, sc, "stageinfo.zoffsetlink",
-			modifyStageVar_stageinfo_zoffsetlink, VT_Int, 1, false); err != nil {
+		if err := c.paramValue(is, sc, "stageinfo.resetbg",
+			modifyStageVar_stageinfo_resetbg, VT_Bool, 1, false); err != nil {
 			return err
 		}
 		if err := c.paramValue(is, sc, "stageinfo.xscale",
@@ -5830,6 +5858,14 @@ func (c *Compiler) modifyStageVar(is IniSection, sc *StateControllerBase, _ int8
 		}
 		if err := c.paramValue(is, sc, "stageinfo.yscale",
 			modifyStageVar_stageinfo_yscale, VT_Float, 1, false); err != nil {
+			return err
+		}
+		if err := c.paramValue(is, sc, "stageinfo.zoffset",
+			modifyStageVar_stageinfo_zoffset, VT_Int, 1, false); err != nil {
+			return err
+		}
+		if err := c.paramValue(is, sc, "stageinfo.zoffsetlink",
+			modifyStageVar_stageinfo_zoffsetlink, VT_Int, 1, false); err != nil {
 			return err
 		}
 		if err := c.paramValue(is, sc, "shadow.intensity",
@@ -6182,6 +6218,10 @@ func (c *Compiler) getHitVarSet(is IniSection, sc *StateControllerBase, _ int8) 
 			getHitVarSet_chainid, VT_Int, 1, false); err != nil {
 			return err
 		}
+		if err := c.paramValue(is, sc, "crouch.friction",
+			getHitVarSet_crouchfriction, VT_Float, 1, false); err != nil {
+			return err
+		}
 		if err := c.paramValue(is, sc, "ctrltime",
 			getHitVarSet_ctrltime, VT_Int, 1, false); err != nil {
 			return err
@@ -6300,6 +6340,10 @@ func (c *Compiler) getHitVarSet(is IniSection, sc *StateControllerBase, _ int8) 
 		}
 		if err := c.paramValue(is, sc, "redlife",
 			getHitVarSet_redlife, VT_Int, 1, false); err != nil {
+			return err
+		}
+		if err := c.paramValue(is, sc, "stand.friction",
+			getHitVarSet_standfriction, VT_Float, 1, false); err != nil {
 			return err
 		}
 		if err := c.paramValue(is, sc, "slidetime",

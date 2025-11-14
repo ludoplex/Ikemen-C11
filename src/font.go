@@ -397,13 +397,13 @@ func LoadFntSff(f *Fnt, fontfile string, filename string) {
 	var idef int
 	for i := 0; i < int(sff.header.NumberOfPalettes); i++ {
 		var pal []uint32
-		si, ok := sff.palList.PalTable[[...]int16{0, int16(i)}]
+		si, ok := sff.palList.PalTable[[...]uint16{0, uint16(i)}]
 		if ok && si >= 0 {
 			pal = sff.palList.Get(si)
 			if i == 0 {
 				idef = si
 			}
-			switch sff.palList.numcols[[...]int16{0, int16(i)}] {
+			switch sff.palList.numcols[[...]uint16{0, uint16(i)}] {
 			case 256:
 				f.coldepth[i] = 8
 			case 32:
@@ -516,13 +516,13 @@ func (f *Fnt) Print(txt string, x, y, xscl, yscl, rxadd float32, rot Rotation, b
 		if f.Type == "truetype" {
 			f.DrawTtf(txt, x, y, xscl, yscl, align, true, window, frgba)
 		} else {
-			f.DrawText(txt, x, y, xscl, yscl, rxadd, rot, bank, align, window, palfx)
+			f.DrawText(txt, x, y, xscl, yscl, rxadd, rot, bank, align, window, palfx, frgba[3])
 		}
 	}
 }
 
 // DrawText prints on screen a specified text with the current font sprites
-func (f *Fnt) DrawText(txt string, x, y, xscl, yscl, rxadd float32, rot Rotation, bank, align int32, window *[4]int32, palfx *PalFX) {
+func (f *Fnt) DrawText(txt string, x, y, xscl, yscl, rxadd float32, rot Rotation, bank, align int32, window *[4]int32, palfx *PalFX, alpha float32) {
 
 	if len(txt) == 0 || xscl == 0 || yscl == 0 {
 		return
@@ -575,6 +575,14 @@ func (f *Fnt) DrawText(txt string, x, y, xscl, yscl, rxadd float32, rot Rotation
 
 	f.paltex = nil
 
+	// Set the trans type
+	tt := TT_none
+	if alpha < 1.0 {
+		tt = TT_add
+	}
+
+	alphaVal := int32(255 * sys.brightness * alpha)
+
 	// Initialize common render parameters
 	rp := RenderParams{
 		tex:            nil,
@@ -592,8 +600,8 @@ func (f *Fnt) DrawText(txt string, x, y, xscl, yscl, rxadd float32, rot Rotation
 		yas:            1,
 		rot:            rot,
 		tint:           0,
-		blendMode:      TT_none,
-		blendAlpha:     [2]int32{int32(255 * sys.brightness), 0},
+		blendMode:      tt,
+		blendAlpha:     [2]int32{alphaVal, 255 - alphaVal},
 		mask:           0,
 		pfx:            palfx,
 		window:         window,
@@ -700,11 +708,11 @@ func (ts *TextSprite) SetWindow(x, y, w, h float32) {
 	ts.window[3] = int32(h*sys.heightScale + 0.5)
 }
 
-func (ts *TextSprite) SetColor(r, g, b int32) {
+func (ts *TextSprite) SetColor(r, g, b, a int32) {
 	ts.forcecolor = true
 	ts.palfx.setColor(r, g, b)
 	ts.frgba = [...]float32{float32(r) / 255, float32(g) / 255,
-		float32(b) / 255, 1.0}
+		float32(b) / 255, float32(a) / 255}
 }
 
 func (ts *TextSprite) SetTextVel() {
@@ -764,7 +772,7 @@ func (ts *TextSprite) Draw() {
 			ts.fnt.DrawTtf(line[:charsToShow], ts.x, newY, ts.xscl, ts.yscl, ts.align, true, &ts.window, ts.frgba)
 		} else {
 			ts.fnt.DrawText(line[:charsToShow], ts.x-xsoffset, newY, ts.xscl, ts.yscl,
-				xshear, Rotation{ts.angle, 0, 0}, ts.bank, ts.align, &ts.window, ts.palfx)
+				xshear, Rotation{ts.angle, 0, 0}, ts.bank, ts.align, &ts.window, ts.palfx, ts.frgba[3])
 		}
 
 		totalCharsShown += charsToShow

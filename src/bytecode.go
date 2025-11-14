@@ -433,8 +433,10 @@ const (
 	OC_const_stagevar_scaling_botscale
 	OC_const_stagevar_bound_screenleft
 	OC_const_stagevar_bound_screenright
+	OC_const_stagevar_stageinfo_autoturn
 	OC_const_stagevar_stageinfo_localcoord_x
 	OC_const_stagevar_stageinfo_localcoord_y
+	OC_const_stagevar_stageinfo_resetbg
 	OC_const_stagevar_stageinfo_xscale
 	OC_const_stagevar_stageinfo_yscale
 	OC_const_stagevar_stageinfo_zoffset
@@ -586,6 +588,8 @@ const (
 	OC_ex_gethitvar_down_recover
 	OC_ex_gethitvar_down_recovertime
 	OC_ex_gethitvar_guardflag
+	OC_ex_gethitvar_stand_friction
+	OC_ex_gethitvar_crouch_friction
 	OC_ex_ailevelf
 	OC_ex_animelemvar_alphadest
 	OC_ex_animelemvar_angle
@@ -718,7 +722,6 @@ const (
 	OC_ex_alpha_s
 	OC_ex_alpha_d
 	OC_ex_selfcommand
-	OC_ex_guardcount
 	OC_ex_fightscreenvar_info_author
 	OC_ex_fightscreenvar_info_localcoord_x
 	OC_ex_fightscreenvar_info_localcoord_y
@@ -960,6 +963,9 @@ const (
 	OC_ex2_zoomvar_lag
 	OC_ex2_zoomvar_time
 	OC_ex2_projclsnoverlap
+	OC_ex2_attackmul
+	OC_ex2_defencemul
+	OC_ex2_guardcount
 )
 
 type StringPool struct {
@@ -2483,10 +2489,14 @@ func (be BytecodeExp) run_const(c *Char, i *int, oc *Char) {
 		sys.bcStack.PushI(int32(float32(sys.stage.screenleft) * sys.stage.localscl / oc.localscl))
 	case OC_const_stagevar_bound_screenright:
 		sys.bcStack.PushI(int32(float32(sys.stage.screenright) * sys.stage.localscl / oc.localscl))
+	case OC_const_stagevar_stageinfo_autoturn:
+		sys.bcStack.PushB(sys.stage.autoturn)
 	case OC_const_stagevar_stageinfo_localcoord_x:
 		sys.bcStack.PushI(sys.stage.stageCamera.localcoord[0])
 	case OC_const_stagevar_stageinfo_localcoord_y:
 		sys.bcStack.PushI(sys.stage.stageCamera.localcoord[1])
+	case OC_const_stagevar_stageinfo_resetbg:
+		sys.bcStack.PushB(sys.stage.resetbg)
 	case OC_const_stagevar_stageinfo_xscale:
 		sys.bcStack.PushF(sys.stage.scale[0])
 	case OC_const_stagevar_stageinfo_yscale:
@@ -2671,6 +2681,18 @@ func (be BytecodeExp) run_ex(c *Char, i *int, oc *Char) {
 		sys.bcStack.PushI(c.ghv.hitshaketime)
 	case OC_ex_gethitvar_hittime:
 		sys.bcStack.PushI(c.ghv.hittime)
+	case OC_ex_gethitvar_stand_friction:
+		sf := c.ghv.standfriction
+		if math.IsNaN(float64(sf)) {
+			sf = c.gi().movement.stand.friction
+		}
+		sys.bcStack.PushF(sf)
+	case OC_ex_gethitvar_crouch_friction:
+		cf := c.ghv.crouchfriction
+		if math.IsNaN(float64(cf)) {
+			cf = c.gi().movement.crouch.friction
+		}
+		sys.bcStack.PushF(cf)
 	case OC_ex_gethitvar_slidetime:
 		sys.bcStack.PushI(c.ghv.slidetime)
 	case OC_ex_gethitvar_ctrltime:
@@ -2947,8 +2969,6 @@ func (be BytecodeExp) run_ex(c *Char, i *int, oc *Char) {
 		sys.bcStack.PushF(c.groundAngle)
 	case OC_ex_guardbreak:
 		sys.bcStack.PushB(c.scf(SCF_guardbreak))
-	case OC_ex_guardcount:
-		sys.bcStack.PushI(c.guardCount)
 	case OC_ex_guardpoints:
 		sys.bcStack.PushI(c.guardPoints)
 	case OC_ex_guardpointsmax:
@@ -3806,6 +3826,12 @@ func (be BytecodeExp) run_ex2(c *Char, i *int, oc *Char) {
 		targetID := sys.bcStack.Pop().ToI()
 		index := sys.bcStack.Pop().ToI()
 		sys.bcStack.PushB(c.projClsnOverlapTrigger(index, targetID, boxType))
+	case OC_ex2_attackmul:
+		sys.bcStack.PushF(c.attackMul[0])
+	case OC_ex2_defencemul:
+		sys.bcStack.PushF(float32(c.finalDefense / float64(c.gi().defenceBase) * 100))
+	case OC_ex2_guardcount:
+		sys.bcStack.PushI(c.guardCount)
 	default:
 		sys.errLog.Printf("%v\n", be[*i-1])
 		c.panic()
@@ -3920,12 +3946,22 @@ func newStateBlock() *StateBlock {
 }
 
 func (b StateBlock) Run(c *Char, ps []int32) (changeState bool) {
+	c.currentSctrlIndex = b.persistentIndex
+	// For Mugen compatibility, if in hitpause and this SCTRL has the same index
+	// as the SCTRL that triggered a ChangeState during the hitpause
+	if c.hitPause() && c.hitStateChangeIdx >= 0 && b.persistentIndex == c.hitStateChangeIdx &&
+		c.stWgi().ikemenver[0] == 0 && c.stWgi().ikemenver[1] == 0 {
+		// skip the execution of this SCTRL
+		return false
+	}
+
 	// Check if the character is currently in a hit pause
 	if c.hitPause() {
 		// If ignorehitpause is less than -1, do not proceed with this controller
 		if b.ignorehitpause < -1 {
 			return false
 		}
+		/* https://github.com/ikemen-engine/Ikemen-GO/issues/2360
 		// If ignorehitpause is non-negative, use the hitPauseExecutionToggleFlags mechanism
 		if b.ignorehitpause >= 0 {
 			flag := &c.ss.hitPauseExecutionToggleFlags[sys.workingState.playerNo][b.ignorehitpause]
@@ -3936,6 +3972,7 @@ func (b StateBlock) Run(c *Char, ps []int32) (changeState bool) {
 				return false
 			}
 		}
+		*/
 	}
 	if b.persistentIndex >= 0 {
 		ps[b.persistentIndex]--
@@ -4408,7 +4445,7 @@ func (sc playSnd) Run(c *Char, _ []int32) bool {
 
 	x := &crun.pos[0]
 	ls := crun.localscl
-	f, lw, lp, stopgh, stopcs := "", false, false, false, false
+	f, lw, lp, stopgh, stopcs, vscaleflg := "", false, false, false, false, false
 	var g, n, ch, vo, pri, lc int32 = -1, 0, -1, 100, 0, 0
 	var loopstart, loopend, startposition = 0, 0, 0
 	var p, fr float32 = 0, 1
@@ -4435,9 +4472,10 @@ func (sc playSnd) Run(c *Char, _ []int32) bool {
 			ls = 1
 			p = exp[0].evalF(c)
 		case playSnd_volume:
-			vo = vo + int32(float64(exp[0].evalI(c))*(25.0/64.0))
+			vo = vo + int32(float64(exp[0].evalI(c))*(25.0/128.0))
 		case playSnd_volumescale:
 			vo = exp[0].evalI(c)
+			vscaleflg = true
 		case playSnd_freqmul:
 			fr = ClampF(exp[0].evalF(c), 0.01, 5)
 		case playSnd_loop:
@@ -4462,6 +4500,10 @@ func (sc playSnd) Run(c *Char, _ []int32) bool {
 	// Read the loop parameter if loopcount not specified
 	if lc == 0 {
 		if lp {
+			// WINMUGEN has a bug where the volume parameter is disabled when loop is specified
+			if !vscaleflg && c.stWgi().ikemenver[0] == 0 && c.stWgi().ikemenver[1] == 0 {
+				vo = 100
+			}
 			crun.playSound(f, lw, -1, g, n, ch, vo, p, fr, ls, x, true, pri, loopstart, loopend, startposition, stopgh, stopcs)
 		} else {
 			crun.playSound(f, lw, 0, g, n, ch, vo, p, fr, ls, x, true, pri, loopstart, loopend, startposition, stopgh, stopcs)
@@ -4523,6 +4565,7 @@ func (sc selfState) Run(c *Char, _ []int32) bool {
 	stop := (crun.id == c.id)
 	var v, a, r, ctrl int32 = -1, -1, -1, -1
 	ffx := ""
+
 	StateControllerBase(sc).run(c, func(paramID byte, exp []BytecodeExp) bool {
 		switch paramID {
 		case changeState_value:
@@ -5440,6 +5483,7 @@ const (
 	explod_interpolation
 	explod_animplayerno
 	explod_spriteplayerno
+	explod_syncparams
 	explod_synclayer
 	explod_syncid
 	explod_last = iota + palFX_last + afterImage_last + 1 - 1
@@ -5668,6 +5712,8 @@ func (sc explod) Run(c *Char, _ []int32) bool {
 				sId = crun.id
 			}
 			e.syncId = sId
+		case explod_syncparams:
+			e.syncParams = exp[0].evalB(c)
 		case explod_projection:
 			e.projection = Projection(exp[0].evalI(c))
 		case explod_window:
@@ -6264,6 +6310,11 @@ func (sc modifyExplod) Run(c *Char, _ []int32) bool {
 				eachExpl(func(e *Explod) {
 					e.syncId = sId
 				})
+			case explod_syncparams:
+				sp := exp[0].evalB(c)
+				eachExpl(func(e *Explod) {
+					e.syncParams = sp
+				})
 			case explod_interpolation:
 				if c.stWgi().ikemenver[0] != 0 || c.stWgi().ikemenver[1] != 0 {
 					interpolation := exp[0].evalB(c)
@@ -6642,8 +6693,8 @@ const (
 	hitDef_sparkscale
 	hitDef_guard_sparkscale
 	hitDef_unhittabletime
-	hitDef_p2stand_friction
-	hitDef_p2crouch_friction
+	hitDef_stand_friction
+	hitDef_crouch_friction
 	hitDef_keepstate
 	hitDef_missonreversaldef
 	hitDef_last = iota + afterImage_last + 1 - 1
@@ -7017,10 +7068,10 @@ func (sc hitDef) runSub(c *Char, hd *HitDef, paramID byte, exp []BytecodeExp) bo
 		if len(exp) > 1 {
 			hd.unhittabletime[1] = exp[1].evalI(c)
 		}
-	case hitDef_p2stand_friction:
-		hd.P2StandFriction = exp[0].evalF(c)
-	case hitDef_p2crouch_friction:
-		hd.P2CrouchFriction = exp[0].evalF(c)
+	case hitDef_stand_friction:
+		hd.StandFriction = exp[0].evalF(c)
+	case hitDef_crouch_friction:
+		hd.CrouchFriction = exp[0].evalF(c)
 	case hitDef_keepstate:
 		hd.KeepState = exp[0].evalB(c)
 	case hitDef_missonreversaldef:
@@ -9198,7 +9249,7 @@ func (sc envShake) Run(c *Char, _ []int32) bool {
 		case envShake_freq:
 			sys.envShake.freq = MaxF(0, exp[0].evalF(c)*float32(math.Pi)/180)
 		case envShake_phase:
-			sys.envShake.phase = MaxF(0, exp[0].evalF(c)*float32(math.Pi)/180)
+			sys.envShake.phase = MaxF(-180*float32(math.Pi)/180, exp[0].evalF(c)*float32(math.Pi)/180)
 		case envShake_mul:
 			sys.envShake.mul = exp[0].evalF(c)
 		case envShake_dir:
@@ -11212,8 +11263,7 @@ func (sc remapSprite) Run(c *Char, _ []int32) bool {
 	if crun == nil {
 		return false
 	}
-
-	src := [...]int16{-1, -1}
+	src := [...]int32{-1, -1}
 
 	StateControllerBase(sc).run(c, func(paramID byte, exp []BytecodeExp) bool {
 		switch paramID {
@@ -11224,14 +11274,14 @@ func (sc remapSprite) Run(c *Char, _ []int32) bool {
 		case remapSprite_preset:
 			crun.remapSpritePreset(string(*(*[]byte)(unsafe.Pointer(&exp[0]))))
 		case remapSprite_source:
-			src[0] = int16(exp[0].evalI(c))
+			src[0] = int32(exp[0].evalI(c))
 			if len(exp) > 1 {
-				src[1] = int16(exp[1].evalI(c))
+				src[1] = int32(exp[1].evalI(c))
 			}
 		case remapSprite_dest:
-			dst := [...]int16{int16(exp[0].evalI(c)), -1}
+			dst := [...]int32{int32(exp[0].evalI(c)), -1}
 			if len(exp) > 1 {
-				dst[1] = int16(exp[1].evalI(c))
+				dst[1] = int32(exp[1].evalI(c))
 			}
 			crun.remapSprite(src, dst)
 		}
@@ -12141,14 +12191,17 @@ func (sc text) Run(c *Char, _ []int32) bool {
 				yscl = exp[1].evalF(c)
 			}
 		case text_color:
-			var r, g, b int32 = exp[0].evalI(c), 255, 255
+			var r, g, b, a int32 = exp[0].evalI(c), 255, 255, 255
 			if len(exp) > 1 {
 				g = exp[1].evalI(c)
 				if len(exp) > 2 {
 					b = exp[2].evalI(c)
+					if len(exp) > 3 {
+						a = exp[3].evalI(c)
+					}
 				}
 			}
-			ts.SetColor(r, g, b)
+			ts.SetColor(r, g, b, a)
 		case text_xshear:
 			ts.xshear = exp[0].evalF(c)
 		case text_id:
@@ -12442,15 +12495,18 @@ func (sc modifyText) Run(c *Char, _ []int32) bool {
 					})
 				}
 			case text_color:
-				var r, g, b int32 = exp[0].evalI(c), 255, 255
+				var r, g, b, a int32 = exp[0].evalI(c), 255, 255, 255
 				if len(exp) > 1 {
 					g = exp[1].evalI(c)
 					if len(exp) > 2 {
 						b = exp[2].evalI(c)
+						if len(exp) > 3 {
+							a = exp[3].evalI(c)
+						}
 					}
 				}
 				eachText(func(ts *TextSprite) {
-					ts.SetColor(r, g, b)
+					ts.SetColor(r, g, b, a)
 				})
 			case text_xshear:
 				xs := exp[0].evalF(c)
@@ -12612,10 +12668,12 @@ const (
 	modifyStageVar_scaling_botscale
 	modifyStageVar_bound_screenleft
 	modifyStageVar_bound_screenright
-	modifyStageVar_stageinfo_zoffset
-	modifyStageVar_stageinfo_zoffsetlink
+	modifyStageVar_stageinfo_autoturn
+	modifyStageVar_stageinfo_resetbg
 	modifyStageVar_stageinfo_xscale
 	modifyStageVar_stageinfo_yscale
+	modifyStageVar_stageinfo_zoffset
+	modifyStageVar_stageinfo_zoffsetlink
 	modifyStageVar_shadow_intensity
 	modifyStageVar_shadow_color
 	modifyStageVar_shadow_yscale
@@ -12746,21 +12804,13 @@ func (sc modifyStageVar) Run(c *Char, _ []int32) bool {
 			s.p[1].facing = exp[0].evalI(c)
 		// Scaling group
 		case modifyStageVar_scaling_topz:
-			if s.mugenver[0] != 1 { // mugen 1.0+ removed support for topz
-				s.stageCamera.topz = exp[0].evalF(c)
-			}
+			s.stageCamera.topz = exp[0].evalF(c)
 		case modifyStageVar_scaling_botz:
-			if s.mugenver[0] != 1 { // mugen 1.0+ removed support for botz
-				s.stageCamera.botz = exp[0].evalF(c)
-			}
+			s.stageCamera.botz = exp[0].evalF(c)
 		case modifyStageVar_scaling_topscale:
-			if s.mugenver[0] != 1 { // mugen 1.0+ removed support for topscale
-				s.stageCamera.ztopscale = exp[0].evalF(c)
-			}
+			s.stageCamera.ztopscale = exp[0].evalF(c)
 		case modifyStageVar_scaling_botscale:
-			if s.mugenver[0] != 1 { // mugen 1.0+ removed support for botscale
-				s.stageCamera.zbotscale = exp[0].evalF(c)
-			}
+			s.stageCamera.zbotscale = exp[0].evalF(c)
 		// Bound group
 		case modifyStageVar_bound_screenleft:
 			s.screenleft = int32(exp[0].evalF(c) * scaleratio)
@@ -12769,15 +12819,19 @@ func (sc modifyStageVar) Run(c *Char, _ []int32) bool {
 			s.screenright = int32(exp[0].evalF(c) * scaleratio)
 			shouldResetCamera = true
 		// StageInfo group
+		case modifyStageVar_stageinfo_autoturn:
+			s.autoturn = exp[0].evalB(c)
+		case modifyStageVar_stageinfo_resetbg:
+			s.resetbg = exp[0].evalB(c)
+		case modifyStageVar_stageinfo_xscale:
+			s.scale[0] = exp[0].evalF(c)
+		case modifyStageVar_stageinfo_yscale:
+			s.scale[1] = exp[0].evalF(c)
 		case modifyStageVar_stageinfo_zoffset:
 			s.stageCamera.zoffset = int32(exp[0].evalF(c) * scaleratio)
 			shouldResetCamera = true
 		case modifyStageVar_stageinfo_zoffsetlink:
 			s.zoffsetlink = exp[0].evalI(c)
-		case modifyStageVar_stageinfo_xscale:
-			s.scale[0] = exp[0].evalF(c)
-		case modifyStageVar_stageinfo_yscale:
-			s.scale[1] = exp[0].evalF(c)
 		// Shadow group
 		case modifyStageVar_shadow_intensity:
 			s.sdw.intensity = Clamp(exp[0].evalI(c), 0, 255)
@@ -13135,6 +13189,7 @@ const (
 	getHitVarSet_animtype
 	getHitVarSet_attr
 	getHitVarSet_chainid
+	getHitVarSet_crouchfriction
 	getHitVarSet_ctrltime
 	getHitVarSet_damage
 	getHitVarSet_dizzypoints
@@ -13167,6 +13222,7 @@ const (
 	getHitVarSet_playerno
 	getHitVarSet_redlife
 	getHitVarSet_slidetime
+	getHitVarSet_standfriction
 	getHitVarSet_xvel
 	getHitVarSet_yvel
 	getHitVarSet_zvel
@@ -13194,6 +13250,8 @@ func (sc getHitVarSet) Run(c *Char, _ []int32) bool {
 			crun.ghv.attr = exp[0].evalI(c)
 		case getHitVarSet_chainid:
 			crun.ghv.hitid = exp[0].evalI(c)
+		case getHitVarSet_crouchfriction:
+			crun.ghv.crouchfriction = exp[0].evalF(c)
 		case getHitVarSet_ctrltime:
 			crun.ghv.ctrltime = exp[0].evalI(c)
 		case getHitVarSet_damage:
@@ -13256,6 +13314,8 @@ func (sc getHitVarSet) Run(c *Char, _ []int32) bool {
 			crun.ghv.redlife = exp[0].evalI(c)
 		case getHitVarSet_slidetime:
 			crun.ghv.slidetime = exp[0].evalI(c)
+		case getHitVarSet_standfriction:
+			crun.ghv.standfriction = exp[0].evalF(c)
 		case getHitVarSet_xvel:
 			crun.ghv.xvel = exp[0].evalF(c) * redirscale
 		case getHitVarSet_yvel:
@@ -13500,8 +13560,8 @@ func (sc modifyStageBG) Run(c *Char, _ []int32) bool {
 				eachBg(func(bg *backGround) {
 					if bg._type == BG_Normal {
 						bg.anim.frames = []AnimFrame{*newAnimFrame()}
-						bg.anim.frames[0].Group = I32ToI16(gr)
-						bg.anim.frames[0].Number = I32ToI16(im)
+						bg.anim.frames[0].Group = gr
+						bg.anim.frames[0].Number = im
 					}
 				})
 			case modifyStageBG_start_x:
@@ -13566,18 +13626,21 @@ func (sc modifyStageBG) Run(c *Char, _ []int32) bool {
 type modifyShadow StateControllerBase
 
 const (
-	modifyShadow_anim byte = iota
+	modifyShadow_angle byte = iota
+	modifyShadow_anim
+	modifyShadow_animplayerno
+	modifyShadow_spriteplayerno
 	modifyShadow_color
+	modifyShadow_focallength
 	modifyShadow_intensity
 	modifyShadow_offset
-	modifyShadow_window
-	modifyShadow_xshear
-	modifyShadow_yscale
-	modifyShadow_angle
-	modifyShadow_xangle
-	modifyShadow_yangle
-	modifyShadow_focallength
 	modifyShadow_projection
+	modifyShadow_window
+	modifyShadow_xangle
+	modifyShadow_xscale
+	modifyShadow_xshear
+	modifyShadow_yangle
+	modifyShadow_yscale
 	modifyShadow_redirectid
 )
 
@@ -13588,14 +13651,19 @@ func (sc modifyShadow) Run(c *Char, _ []int32) bool {
 	}
 
 	redirscale := c.localscl / crun.localscl
+	animPN := crun.playerNo
+	spritePN := crun.playerNo
 
 	StateControllerBase(sc).run(c, func(paramID byte, exp []BytecodeExp) bool {
 		switch paramID {
+		case modifyShadow_animplayerno:
+			animPN = int(exp[0].evalI(c)) - 1
+		case modifyShadow_spriteplayerno:
+			spritePN = int(exp[0].evalI(c)) - 1
 		case modifyShadow_anim:
 			ffx := string(*(*[]byte)(unsafe.Pointer(&exp[0])))
 			animNo := exp[1].evalI(c)
-			// We'll use crun.playerNo as animPN and spritePN because the main use case is replacing the shadow with one of your own anims
-			anim := c.getAnimSprite(animNo, crun.playerNo, crun.playerNo, ffx, true, false)
+			anim := c.getAnimSprite(animNo, animPN, spritePN, ffx, true, false)
 			if anim != nil {
 				anim.Action() // Need to step for it to appear
 				crun.shadowAnim = anim
@@ -13619,6 +13687,8 @@ func (sc modifyShadow) Run(c *Char, _ []int32) bool {
 			}
 		case modifyShadow_window:
 			crun.shadowWindow = [4]float32{exp[0].evalF(c), exp[1].evalF(c), exp[2].evalF(c), exp[3].evalF(c)}
+		case modifyShadow_xscale:
+			crun.shadowXscale = exp[0].evalF(c)
 		case modifyShadow_xshear:
 			crun.shadowXshear = exp[0].evalF(c)
 		case modifyShadow_yscale:
@@ -13643,10 +13713,13 @@ type modifyReflection StateControllerBase
 
 const (
 	modifyReflection_anim byte = iota
+	modifyReflection_animplayerno
+	modifyReflection_spriteplayerno
 	modifyReflection_color
 	modifyReflection_intensity
 	modifyReflection_offset
 	modifyReflection_window
+	modifyReflection_xscale
 	modifyReflection_xshear
 	modifyReflection_yscale
 	modifyReflection_angle
@@ -13664,13 +13737,19 @@ func (sc modifyReflection) Run(c *Char, _ []int32) bool {
 	}
 
 	redirscale := c.localscl / crun.localscl
+	animPN := crun.playerNo
+	spritePN := crun.playerNo
 
 	StateControllerBase(sc).run(c, func(paramID byte, exp []BytecodeExp) bool {
 		switch paramID {
+		case modifyReflection_animplayerno:
+			animPN = int(exp[0].evalI(c)) - 1
+		case modifyReflection_spriteplayerno:
+			spritePN = int(exp[0].evalI(c)) - 1
 		case modifyReflection_anim:
 			ffx := string(*(*[]byte)(unsafe.Pointer(&exp[0])))
 			animNo := exp[1].evalI(c)
-			anim := c.getAnimSprite(animNo, crun.playerNo, crun.playerNo, ffx, true, false)
+			anim := c.getAnimSprite(animNo, animPN, spritePN, ffx, true, false)
 			if anim != nil {
 				anim.Action() // Need to step for it to appear
 				crun.reflectAnim = anim
@@ -13694,6 +13773,8 @@ func (sc modifyReflection) Run(c *Char, _ []int32) bool {
 			}
 		case modifyReflection_window:
 			crun.reflectWindow = [4]float32{exp[0].evalF(c), exp[1].evalF(c), exp[2].evalF(c), exp[3].evalF(c)}
+		case modifyReflection_xscale:
+			crun.reflectXscale = exp[0].evalF(c)
 		case modifyReflection_xshear:
 			crun.reflectXshear = exp[0].evalF(c)
 		case modifyReflection_yscale:

@@ -506,6 +506,7 @@ function text:create(t)
 	t.r = t.r or 255
 	t.g = t.g or 255
 	t.b = t.b or 255
+	t.a = t.a or 255
 	t.height = t.height or -1
 	if t.window == nil then t.window = {} end
 	t.window[1] = t.window[1] or 0
@@ -532,7 +533,7 @@ function text:create(t)
 	textImgSetBank(t.ti, t.bank)
 	textImgSetAlign(t.ti, t.align)
 	textImgSetText(t.ti, t.text)
-	textImgSetColor(t.ti, t.r, t.g, t.b)
+	textImgSetColor(t.ti, t.r, t.g, t.b, t.a)
 	if t.defsc then disableLuaScale() end
 	textImgSetPos(t.ti, t.x + main.f_alignOffset(t.align), t.y)
 	textImgSetScale(t.ti, t.scaleX, t.scaleY)
@@ -585,7 +586,7 @@ function text:update(t)
 		textImgSetBank(self.ti, self.bank)
 		textImgSetAlign(self.ti, self.align)
 		textImgSetText(self.ti, self.text)
-		textImgSetColor(self.ti, self.r, self.g, self.b)
+		textImgSetColor(self.ti, self.r, self.g, self.b, self.a)
 		if self.defsc then disableLuaScale() end
 		textImgSetPos(self.ti, self.x + main.f_alignOffset(self.align), self.y)
 		textImgSetScale(self.ti, self.scaleX, self.scaleY)
@@ -732,7 +733,8 @@ function main.f_createTextImg(t, prefix, mod)
 		r =      t[prefix .. '_font'][4],
 		g =      t[prefix .. '_font'][5],
 		b =      t[prefix .. '_font'][6],
-		height = t[prefix .. '_font'][7],
+		a =      t[prefix .. '_font'][7],
+		height = t[prefix .. '_font'][8],
 		xshear = t[prefix .. '_xshear'] or 0,
 		angle  = t[prefix .. '_angle'] or 0,
 		window = t[prefix .. '_window'],
@@ -1309,7 +1311,7 @@ end
 
 --y spacing calculation
 function main.f_ySpacing(t, key)
-	local font_def = main.font_def[t[key .. '_font'][1] .. t[key .. '_font'][7]]
+	local font_def = main.font_def[t[key .. '_font'][1] .. t[key .. '_font'][8]]
 	if font_def == nil then return 0 end
 	return main.f_round(font_def.Size[2] * t[key .. '_scale'][2] + font_def.Spacing[2] * t[key .. '_scale'][2])
 end
@@ -1672,11 +1674,13 @@ for i = 1, 2 do
 end
 
 -- generate preload stage spr/anim list
-if #motif.select_info.stage_portrait_spr >= 2 and motif.select_info.stage_portrait_spr[1] >= 0 then
-	preloadListStage(motif.select_info.stage_portrait_spr[1], motif.select_info.stage_portrait_spr[2])
-end
-if motif.select_info.stage_portrait_anim >= 0 then
-	preloadListStage(motif.select_info.stage_portrait_anim)
+for _, v in ipairs({{sec = 'select_info'}, {sec = 'vs_screen'}}) do
+	if #motif[v.sec].stage_portrait_spr >= 2 and motif[v.sec].stage_portrait_spr[1] >= 0 then
+		preloadListStage(motif[v.sec].stage_portrait_spr[1], motif[v.sec].stage_portrait_spr[2])
+	end
+	if motif[v.sec].stage_portrait_anim >= 0 then
+		preloadListStage(motif[v.sec].stage_portrait_anim)
+	end
 end
 
 --warning display
@@ -2043,28 +2047,33 @@ function main.f_addStage(file, hidden)
 	end
 	main.t_stageDef[file:lower()] = stageNo
 	--anim data
-	for _, v in pairs({{motif.select_info.stage_portrait_anim, -1}, motif.select_info.stage_portrait_spr}) do
-		if #v > 0 and v[1] ~= -1 then
-			main.t_selStages[stageNo].anim_data = animGetPreloadedStageData(stageNo, v[1], v[2])
-			if main.t_selStages[stageNo].anim_data ~= nil then
-				animSetScale(
-					main.t_selStages[stageNo].anim_data,
-					motif.select_info.stage_portrait_scale[1] * main.t_selStages[stageNo].portrait_scale / (motifViewport43(2) / motifLocalcoord(0)),
-					motif.select_info.stage_portrait_scale[2] * main.t_selStages[stageNo].portrait_scale / (motifViewport43(2) / motifLocalcoord(0)),
-					false
-				)
-				animSetWindow(
-					main.t_selStages[stageNo].anim_data,
-					motif.select_info.stage_portrait_window[1],
-					motif.select_info.stage_portrait_window[2],
-					motif.select_info.stage_portrait_window[3],
-					motif.select_info.stage_portrait_window[4]
-				)
-				animUpdate(main.t_selStages[stageNo].anim_data)
-				break
+	local function f_makeStageAnim(stageNo, motifSection, fieldName)
+		for _, v in pairs({{motifSection.stage_portrait_anim, -1}, motifSection.stage_portrait_spr}) do
+			if #v > 0 and v[1] ~= -1 then
+				local anim = animGetPreloadedStageData(stageNo, v[1], v[2])
+				if anim ~= nil then
+					animSetScale(anim,
+						motifSection.stage_portrait_scale[1] * main.t_selStages[stageNo].portrait_scale / (motifViewport43(2) / motifLocalcoord(0)),
+						motifSection.stage_portrait_scale[2] * main.t_selStages[stageNo].portrait_scale / (motifViewport43(2) / motifLocalcoord(0)),
+						false
+					)
+					animSetWindow(anim,
+						motifSection.stage_portrait_window[1],
+						motifSection.stage_portrait_window[2],
+						motifSection.stage_portrait_window[3],
+						motifSection.stage_portrait_window[4]
+					)
+					animUpdate(anim)
+					main.t_selStages[stageNo][fieldName] = anim
+					break
+				end
 			end
 		end
 	end
+	--select screen anim data
+	f_makeStageAnim(stageNo, motif.select_info, "anim_data")
+	--vs screen anim data
+	f_makeStageAnim(stageNo, motif.vs_screen, "vs_anim_data")
 	if hidden ~= nil and hidden ~= 0 then
 		main.t_selStages[stageNo].hidden = hidden
 	end
@@ -3375,6 +3384,9 @@ function main.f_start()
 			elseif c == 'storymode' and #main.t_selStoryMode == 0 then --skip story mode if there are no story arc declared
 				t_skipGroup[c] = true
 				break
+			elseif c == 'versuscoop' and gameOption('Config.Players') < 4 then --skip versus coop if there are not enough players
+				t_skipGroup[c] = true
+				break
 			end
 			--appending the menu table
 			if j == 1 then --first string after menu.itemname (either reserved one or custom submenu assignment)
@@ -4118,7 +4130,8 @@ function main.f_menuCommonDraw(t, item, cursorPosY, moveTxt, section, bgdef, tit
 						r =      motif[section].menu_item_selected_active_font[4],
 						g =      motif[section].menu_item_selected_active_font[5],
 						b =      motif[section].menu_item_selected_active_font[6],
-						height = motif[section].menu_item_selected_active_font[7],
+						a =      motif[section].menu_item_selected_active_font[7],
+						height = motif[section].menu_item_selected_active_font[8],
 						xshear = motif[section].menu_item_selected_active_xshear,
 						angle  = motif[section].menu_item_selected_active_angle,
 						defsc =  defsc,
@@ -4137,7 +4150,8 @@ function main.f_menuCommonDraw(t, item, cursorPosY, moveTxt, section, bgdef, tit
 						r =      motif[section].menu_item_active_font[4],
 						g =      motif[section].menu_item_active_font[5],
 						b =      motif[section].menu_item_active_font[6],
-						height = motif[section].menu_item_active_font[7],
+						a =      motif[section].menu_item_active_font[7],
+						height = motif[section].menu_item_active_font[8],
 						xshear = motif[section].menu_item_active_xshear,
 						angle  = motif[section].menu_item_active_angle,
 						defsc =  defsc,
@@ -4157,7 +4171,8 @@ function main.f_menuCommonDraw(t, item, cursorPosY, moveTxt, section, bgdef, tit
 						r =      motif[section].menu_item_value_active_font[4],
 						g =      motif[section].menu_item_value_active_font[5],
 						b =      motif[section].menu_item_value_active_font[6],
-						height = motif[section].menu_item_value_active_font[7],
+						a =      motif[section].menu_item_value_active_font[7],
+						height = motif[section].menu_item_value_active_font[8],
 						xshear = motif[section].menu_item_value_active_xshear,
 						angle  = motif[section].menu_item_value_active_angle,
 						defsc =  defsc,
@@ -4192,7 +4207,8 @@ function main.f_menuCommonDraw(t, item, cursorPosY, moveTxt, section, bgdef, tit
 						r =      motif[section].menu_item_selected_font[4],
 						g =      motif[section].menu_item_selected_font[5],
 						b =      motif[section].menu_item_selected_font[6],
-						height = motif[section].menu_item_selected_font[7],
+						a =      motif[section].menu_item_selected_font[7],
+						height = motif[section].menu_item_selected_font[8],
 						xshear = motif[section].menu_item_selected_xshear,
 						angle  = motif[section].menu_item_selected_angle,
 						defsc =  defsc,
@@ -4211,7 +4227,8 @@ function main.f_menuCommonDraw(t, item, cursorPosY, moveTxt, section, bgdef, tit
 						r =      motif[section].menu_item_font[4],
 						g =      motif[section].menu_item_font[5],
 						b =      motif[section].menu_item_font[6],
-						height = motif[section].menu_item_font[7],
+						a =      motif[section].menu_item_font[7],
+						height = motif[section].menu_item_font[8],
 						xshear = motif[section].menu_item_xshear,
 						angle  = motif[section].menu_item_angle,
 						defsc =  defsc,
@@ -4231,7 +4248,8 @@ function main.f_menuCommonDraw(t, item, cursorPosY, moveTxt, section, bgdef, tit
 						r =      motif[section].menu_item_value_font[4],
 						g =      motif[section].menu_item_value_font[5],
 						b =      motif[section].menu_item_value_font[6],
-						height = motif[section].menu_item_value_font[7],
+						a =      motif[section].menu_item_value_font[7],
+						height = motif[section].menu_item_value_font[8],
 						xshear = motif[section].menu_item_value_xshear,
 						angle  = motif[section].menu_item_value_angle,
 						defsc =  defsc,

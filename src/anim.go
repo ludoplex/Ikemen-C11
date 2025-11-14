@@ -8,20 +8,21 @@ import (
 
 // AnimFrame holds frame data, used in animation tables.
 type AnimFrame struct {
-	Time          int32
-	Group, Number int16
-	Xoffset       int16
-	Yoffset       int16
-	TransType     TransType
-	SrcAlpha      byte
-	DstAlpha      byte
-	Hscale        int8
-	Vscale        int8
-	Xscale        float32
-	Yscale        float32
-	Angle         float32
-	Clsn1         [][4]float32
-	Clsn2         [][4]float32
+	Time      int32
+	Group     int32
+	Number    int32
+	Xoffset   int32
+	Yoffset   int32
+	TransType TransType
+	SrcAlpha  byte
+	DstAlpha  byte
+	Hscale    int8
+	Vscale    int8
+	Xscale    float32
+	Yscale    float32
+	Angle     float32
+	Clsn1     [][4]float32
+	Clsn2     [][4]float32
 }
 
 func newAnimFrame() *AnimFrame {
@@ -50,10 +51,10 @@ func ReadAnimFrame(line string) *AnimFrame {
 
 	// Read required parameters
 	af := newAnimFrame()
-	af.Group = int16(Atoi(ary[0]))
-	af.Number = int16(Atoi(ary[1]))
-	af.Xoffset = int16(Atoi(ary[2]))
-	af.Yoffset = int16(Atoi(ary[3]))
+	af.Group = int32(Atoi(ary[0]))
+	af.Number = int32(Atoi(ary[1]))
+	af.Xoffset = int32(Atoi(ary[2]))
+	af.Yoffset = int32(Atoi(ary[3]))
 	af.Time = Atoi(ary[4])
 
 	// Read H and V flags
@@ -550,7 +551,11 @@ func (a *Animation) UpdateSprite() {
 				group, number = mn[0], mn[1]
 			}
 		}
-		a.spr = a.sff.GetSprite(group, number)
+		if group >= 0 && number >= 0 {
+			a.spr = a.sff.GetSprite(uint16(group), uint16(number))
+		} else {
+			a.spr = nil
+		}
 	}
 	a.newframe, a.drawidx = false, a.curelem
 
@@ -861,9 +866,6 @@ func (a *Animation) ShadowDraw(window *[4]int32, x, y, xscl, yscl, vscl, rxadd f
 	// Determine animation angle. Invert for shadows
 	h, v, angle := a.drawSub1(rot.angle, facing)
 	rot.angle = -angle
-	if yscl < 0 && rot.angle != 0 {
-		rxadd = -rxadd
-	}
 
 	// Compute X and Y AIR animation offsets
 	xoff := xscl * airOffsetFix[0] * h * (float32(a.frames[a.drawidx].Xoffset) + a.interpolate_offset_x) * (1 / a.scale_x)
@@ -883,7 +885,7 @@ func (a *Animation) ShadowDraw(window *[4]int32, x, y, xscl, yscl, vscl, rxadd f
 		xbs:            xscl * h * sys.widthScale,
 		ys:             yscl * v * sys.heightScale,
 		vs:             vscl,
-		rxadd:          rxadd,
+		rxadd:          rxadd * sys.widthScale / sys.heightScale,
 		xas:            h,
 		yas:            v,
 		rot:            rot,
@@ -1071,7 +1073,7 @@ func (dl DrawList) draw(cameraX, cameraY, cameraScl float32) {
 			return dl[i].priority > dl[j].priority
 		}
 		// Then by SyncID to group synchronized sprites together
-		if dl[i].syncId != dl[j].syncId {
+		if dl[i].syncId != dl[j].syncId && dl[i].syncId > 0 && dl[j].syncId > 0 {
 			return dl[i].syncId < dl[j].syncId
 		}
 		// Sort by syncLayer to ensure proper layering within a sync group
@@ -1172,6 +1174,7 @@ type ShadowSprite struct {
 	shadowIntensity  int32
 	shadowOffset     [2]float32
 	shadowWindow     [4]float32
+	shadowXscale     float32
 	shadowXshear     float32
 	shadowYscale     float32
 	shadowRot        Rotation
@@ -1279,22 +1282,27 @@ func (sl ShadowList) draw(x, y, scl float32) {
 
 		color = color&0xff*alpha<<8&0xff0000 | color&0xff00*alpha>>8&0xff00 | color&0xff0000*alpha>>24&0xff
 
-		var xshear float32
-		if s.xshear != 0 {
-			xshear = -s.xshear
-		} else {
-			xshear = sys.stage.sdw.xshear + s.shadowXshear
+		xscale := s.shadowXscale
+		if xscale == 0 {
+			xscale = sys.stage.sdw.xscale
 		}
 
-		var yscale float32
-		if s.shadowYscale != 0 {
-			yscale = sys.stage.sdw.yscale * s.shadowYscale
-		} else {
+		yscale := s.shadowYscale
+		if yscale == 0 {
 			yscale = sys.stage.sdw.yscale
 		}
 
+		// Stack original sprite xshear with stage or custom xshear
+		var xshear float32
+		if s.shadowXshear != 0 {
+			xshear = -s.xshear + s.shadowXshear
+		} else {
+			xshear = -s.xshear + sys.stage.sdw.xshear
+		}
+
+		// Invert xshear if sprite is flipped vertically
 		if yscale > 0 {
-			xshear = -xshear // Invert if sprite is flipped
+			xshear = -xshear
 		}
 
 		offsetX := s.shadowOffset[0] + sys.stage.sdw.offset[0]
@@ -1303,22 +1311,31 @@ func (sl ShadowList) draw(x, y, scl float32) {
 		// Rotation offset. Only shadow scale sign
 		xrotoff := xshear * SignF(yscale) * (float32(s.anim.spr.Offset[1]) * s.scl[1])
 
-		rotVal := func(vals ...float32) float32 {
-			for _, v := range vals {
-				if v != 0 {
-					return v
-				}
+		// Add custom or stage shadow rotation to original sprite rotation
+		addRot := func(baseAngle float32, customAngle float32, stageAngle float32) float32 {
+			if customAngle != 0 {
+				return baseAngle + customAngle
 			}
-			return 0
+			return baseAngle + stageAngle
 		}
 
 		rot := Rotation{
-			angle:  rotVal(s.shadowRot.angle, sys.stage.sdw.rot.angle, s.rot.angle),
-			xangle: rotVal(s.shadowRot.xangle, sys.stage.sdw.rot.xangle, s.rot.xangle),
-			yangle: rotVal(s.shadowRot.yangle, sys.stage.sdw.rot.yangle, s.rot.yangle),
+			angle:  addRot(s.rot.angle, s.shadowRot.angle, sys.stage.sdw.rot.angle),
+			xangle: addRot(s.rot.xangle, s.shadowRot.xangle, sys.stage.sdw.rot.xangle),
+			yangle: addRot(s.rot.yangle, s.shadowRot.yangle, sys.stage.sdw.rot.yangle),
+		}
+
+		// If sprite is flipped horizontally, invert the added rotation part
+		// TODO: This is possibly not ideal. Maybe the original sprite's facing should be used instead of checking angle sign
+		if s.rot.angle < 0 {
+			rot.angle = s.rot.angle - (rot.angle - s.rot.angle)
+		}
+		if s.rot.yangle < 0 {
+			rot.yangle = s.rot.yangle - (rot.yangle - s.rot.yangle)
 		}
 
 		if rot.angle != 0 {
+			xshear = -xshear
 			offsetX -= xrotoff
 		} else {
 			offsetX += xrotoff
@@ -1383,7 +1400,7 @@ func (sl ShadowList) draw(x, y, scl float32) {
 		s.anim.ShadowDraw(drawwindow,
 			(sys.cam.Offset[0]-shake[0])-((x-s.pos[0]-offsetX)*scl),
 			sys.cam.GroundLevel()+(sys.cam.Offset[1]-shake[1])-y-(sdwPosY*yscale-offsetY)*scl,
-			scl*s.scl[0], scl*-s.scl[1],
+			scl*s.scl[0]*xscale, scl*-s.scl[1],
 			yscale, xshear, rot,
 			s.pfx, uint32(color), intensity, s.facing, s.airOffsetFix, projection, fLength)
 	}
@@ -1396,6 +1413,7 @@ type ReflectionSprite struct {
 	reflectIntensity  int32
 	reflectOffset     [2]float32
 	reflectWindow     [4]float32
+	reflectXscale     float32
 	reflectXshear     float32
 	reflectYscale     float32
 	reflectRot        Rotation
@@ -1518,22 +1536,27 @@ func (rl ReflectionList) draw(x, y, scl float32) {
 			refPosY = s.groundLevel + (refPosY-s.groundLevel)*sys.stage.reflection.ydelta
 		}
 
-		var xshear float32
-		if s.xshear != 0 {
-			xshear = -s.xshear
-		} else {
-			xshear = sys.stage.reflection.xshear + s.reflectXshear
+		xscale := s.reflectXscale
+		if xscale == 0 {
+			xscale = sys.stage.reflection.xscale
 		}
 
-		var yscale float32
-		if s.reflectYscale != 0 {
-			yscale = sys.stage.reflection.yscale * s.reflectYscale
-		} else {
+		yscale := s.reflectYscale
+		if yscale == 0 {
 			yscale = sys.stage.reflection.yscale
 		}
 
+		// Stack original sprite xshear with stage or custom xshear
+		var xshear float32
+		if s.reflectXshear != 0 {
+			xshear = -s.xshear + s.reflectXshear
+		} else {
+			xshear = -s.xshear + sys.stage.reflection.xshear
+		}
+
+		// Invert xshear if sprite is flipped vertically
 		if yscale > 0 {
-			xshear = -xshear // Invert if sprite is flipped
+			xshear = -xshear
 		}
 
 		offsetX := s.reflectOffset[0] + sys.stage.reflection.offset[0]
@@ -1542,19 +1565,26 @@ func (rl ReflectionList) draw(x, y, scl float32) {
 		// Rotation offset
 		xrotoff := xshear * yscale * (float32(s.anim.spr.Offset[1]) * s.scl[1] * scl)
 
-		rotVal := func(vals ...float32) float32 {
-			for _, v := range vals {
-				if v != 0 {
-					return v
-				}
+		// Add custom or stage reflection rotation to original sprite rotation
+		addRot := func(baseAngle float32, customAngle float32, stageAngle float32) float32 {
+			if customAngle != 0 {
+				return baseAngle + customAngle
 			}
-			return 0
+			return baseAngle + stageAngle
 		}
 
 		rot := Rotation{
-			angle:  rotVal(s.reflectRot.angle, sys.stage.reflection.rot.angle, s.rot.angle),
-			xangle: rotVal(s.reflectRot.xangle, sys.stage.reflection.rot.xangle, s.rot.xangle),
-			yangle: rotVal(s.reflectRot.yangle, sys.stage.reflection.rot.yangle, s.rot.yangle),
+			angle:  addRot(s.rot.angle, s.reflectRot.angle, sys.stage.reflection.rot.angle),
+			xangle: addRot(s.rot.xangle, s.reflectRot.xangle, sys.stage.reflection.rot.xangle),
+			yangle: addRot(s.rot.yangle, s.reflectRot.yangle, sys.stage.reflection.rot.yangle),
+		}
+
+		// If sprite is flipped horizontally, invert the added rotation part
+		if s.rot.angle < 0 {
+			rot.angle = s.rot.angle - (rot.angle - s.rot.angle)
+		}
+		if s.rot.yangle < 0 {
+			rot.yangle = s.rot.yangle - (rot.yangle - s.rot.yangle)
 		}
 
 		if rot.angle != 0 {
@@ -1623,7 +1653,8 @@ func (rl ReflectionList) draw(x, y, scl float32) {
 		s.anim.Draw(drawwindow,
 			(sys.cam.Offset[0]-shake[0])/scl-(x-s.pos[0]-offsetX),
 			(sys.cam.GroundLevel()+sys.cam.Offset[1]-shake[1])/scl-y/scl-(refPosY*yscale-offsetY),
-			scl, scl, s.scl[0], s.scl[0],
+			scl, scl,
+			s.scl[0]*xscale, s.scl[0]*xscale,
 			-s.scl[1]*yscale, xshear, rot, float32(sys.gameWidth)/2,
 			s.pfx, s.facing, s.airOffsetFix, projection, fLength, color, true)
 
@@ -1654,8 +1685,7 @@ func NewAnim(sff *Sff, action string) *Anim {
 	return a
 }
 
-// CopyAnim creates a deep copy of an animation, ensuring palette independence
-// to avoid palette sharing across players.
+// CopyAnim creates a shallow copy of an animation with independent palette mapping
 func CopyAnim(a *Anim) *Anim {
 	if a == nil || a.anim == nil || a.anim.sff == nil {
 		return nil
@@ -1697,23 +1727,29 @@ func CopyAnim(a *Anim) *Anim {
 	newAnim.anim.interpolate_scale = a.anim.interpolate_scale
 	// Copy all valid sprites safely
 	for _, c := range a.anim.frames {
-		// Ignore invalid / special frames
 		if c.Group < 0 || c.Number < 0 {
-			continue
+			continue // skip empty frames
 		}
-		src, ok := srcSff.sprites[[...]int16{c.Group, c.Number}]
+		key := [...]uint16{uint16(c.Group), uint16(c.Number)}
+		src, ok := srcSff.sprites[key]
 		if !ok || src == nil {
 			continue
 		}
 		dst := newSprite()
-		dst.Pal = src.Pal
+
 		dst.Tex = src.Tex
 		dst.palidx = src.palidx
 		dst.coldepth = src.coldepth
 		// Copy arrays (if not slices, this is fine as-is)
 		dst.Offset = src.Offset
 		dst.Size = src.Size
-		newAnim.anim.sff.sprites[[...]int16{c.Group, c.Number}] = dst
+
+		if dst.palidx == 0 {
+			dst.Pal = nil
+		} else {
+			dst.Pal = src.Pal
+		}
+		newAnim.anim.sff.sprites[key] = dst
 	}
 	return newAnim
 }
@@ -1773,16 +1809,16 @@ func (a *Anim) ResetFrames() {
 	a.anim.Reset()
 }
 
-type PreloadedAnims map[[2]int16]*Animation
+type PreloadedAnims map[[2]int32]*Animation
 
 func NewPreloadedAnims() PreloadedAnims {
-	return PreloadedAnims(make(map[[2]int16]*Animation))
+	return PreloadedAnims(make(map[[2]int32]*Animation))
 }
 
-func (pa PreloadedAnims) get(grp, idx int16) *Animation {
-	a := pa[[...]int16{grp, idx}]
+func (pa PreloadedAnims) get(grp, idx int32) *Animation {
+	a := pa[[...]int32{grp, idx}]
 	if a == nil {
-		return a
+		return nil
 	}
 	ret := &Animation{}
 	*ret = *a
@@ -1790,19 +1826,19 @@ func (pa PreloadedAnims) get(grp, idx int16) *Animation {
 }
 
 func (pa PreloadedAnims) addAnim(anim *Animation, no int32) {
-	pa[[...]int16{int16(no), -1}] = anim
+	pa[[...]int32{no, -1}] = anim
 }
 
-func (pa PreloadedAnims) addSprite(sff *Sff, grp, idx int16) {
+func (pa PreloadedAnims) addSprite(sff *Sff, grp, idx uint16) {
 	if sff.GetSprite(grp, idx) == nil {
 		return
 	}
 	anim := newAnimation(sff, &sff.palList)
 	anim.mask = 0
 	af := newAnimFrame()
-	af.Group, af.Number = grp, idx
+	af.Group, af.Number = int32(grp), int32(idx)
 	anim.frames = append(anim.frames, *af)
-	pa[[...]int16{grp, idx}] = anim
+	pa[[...]int32{int32(grp), int32(idx)}] = anim
 }
 
 func (pa PreloadedAnims) updateSff(sff *Sff) {
