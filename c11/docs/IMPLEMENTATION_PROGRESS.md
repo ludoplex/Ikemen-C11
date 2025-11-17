@@ -14,16 +14,16 @@ This document tracks the implementation progress of Go functions, variables, and
 
 | Category | Total | Complete | Partial | Stub | TODO | Completion % |
 |----------|-------|----------|---------|------|------|--------------|
-| **Core System** | 17 | 5 | 2 | 0 | 8 | 47% |
-| **Configuration** | 12 | 8 | 1 | 0 | 3 | 67% |
-| **Window/Graphics** | 25 | 15 | 0 | 0 | 25 | 60% |
-| **Input System** | 18 | 12 | 0 | 0 | 18 | 67% |
+| **Core System** | 15 | 7 | 0 | 0 | 8 | 47% |
+| **Configuration** | 12 | 8 | 0 | 0 | 4 | 67% |
+| **Window/Graphics** | 25 | 15 | 0 | 0 | 10 | 60% |
+| **Input System** | 18 | 12 | 0 | 0 | 6 | 67% |
+| **Lua Integration** | 35 | 10 | 0 | 0 | 25 | 29% |
+| **Asset Loaders** | 30 | 18 | 0 | 0 | 12 | 60% |
 | **Audio System** | 15 | 0 | 0 | 0 | 15 | 0% |
-| **Asset Loaders** | 30 | 0 | 0 | 0 | 30 | 0% |
 | **Character System** | 45 | 0 | 0 | 0 | 45 | 0% |
 | **Game Loop** | 20 | 0 | 0 | 0 | 20 | 0% |
-| **Lua Integration** | 35 | 10 | 0 | 0 | 35 | 29% |
-| **TOTAL** | 215 | 54 | 3 | 0 | 199 | 25% |
+| **TOTAL** | 215 | 70 | 0 | 0 | 145 | 33% |
 
 ---
 
@@ -149,16 +149,29 @@ This document tracks the implementation progress of Go functions, variables, and
 #### SFF Sprite Loader (src/image.go)
 | Function | Go Location | C11 Function | C11 Location | Status | Notes |
 |----------|-------------|--------------|--------------|--------|-------|
-| SFF v1.0 parser | image.go:* | - | - | ⬜ TODO | Old format |
-| SFF v2.0 parser | image.go:* | - | - | ⬜ TODO | New format |
-| Palette extraction | image.go:* | - | - | ⬜ TODO | Color palettes |
+| SFF v1.0 parser | image.go:466-545 | ikm_sff_read_header_v1 | image.c:156-209 | ✅ COMPLETE | Old format |
+| SFF v2.0 parser | image.go:546-600 | ikm_sff_read_header_v2 | image.c:212-246 | ✅ COMPLETE | New format |
+| Sprite structure | image.go:547-568 | ikm_sprite_t | image.c:200-216 | ✅ COMPLETE | Group/number indexing |
+| SFF file loading | image.go:1257-1300 | ikm_sff_load | image.c:315-387 | ✅ COMPLETE | File parser |
+| Sprite lookup | - | ikm_sff_get_sprite | image.c:390-403 | ✅ COMPLETE | Find by group/number |
+| PalFX effects | image.go:57-100 | ikm_palfx_t | image.c:14-93 | ✅ COMPLETE | Palette effects |
+| Palette list | image.go:382-465 | ikm_palette_list_t | image.c:436-494 | ✅ COMPLETE | 256-color palettes |
+| PCX RLE decode | - | ikm_pcx_decode_rle | image.c:497-520 | ✅ COMPLETE | RLE decompression |
+| Texture mgmt | - | ikm_texture_t | image.c:406-434 | ✅ COMPLETE | OpenGL integration |
 
 #### AIR Animation Parser (src/anim.go)
 | Function | Go Location | C11 Function | C11 Location | Status | Notes |
 |----------|-------------|--------------|--------------|--------|-------|
-| AIR file parser | anim.go:* | - | - | ⬜ TODO | Animation defs |
-| Action parsing | anim.go:* | - | - | ⬜ TODO | Animation actions |
-| CLSN box parsing | anim.go:* | - | - | ⬜ TODO | Collision boxes |
+| Animation frame | anim.go:10-41 | ikm_anim_frame_t | anim.c:20-38 | ✅ COMPLETE | Frame structure |
+| Frame parsing | anim.go:42-157 | ikm_anim_frame_parse | anim.c:49-143 | ✅ COMPLETE | Group/number/offsets/alpha |
+| Animation struct | anim.go:159-200 | ikm_animation_t | anim.c:158-178 | ✅ COMPLETE | Playback state |
+| Animation update | anim.go:250-350 | ikm_animation_update | anim.c:209-246 | ✅ COMPLETE | Frame advancement |
+| AIR file struct | - | ikm_air_file_t | anim.c:260-267 | ✅ COMPLETE | Action container |
+| AIR file loading | - | ikm_air_load | anim.c:288-367 | ✅ COMPLETE | [Begin Action N] parser |
+| Action lookup | - | ikm_air_get_animation | anim.c:370-381 | ✅ COMPLETE | Get by action number |
+| CLSN box struct | - | ikm_clsn_box_t | anim.c:13-16 | ✅ COMPLETE | Collision boxes |
+| Alpha blending | anim.go:106-131 | - | anim.c:111-141 | ✅ COMPLETE | A/AS/S/SS modes |
+| Frame transforms | anim.go:136-154 | - | anim.c:133-141 | ✅ COMPLETE | Scale/rotate/flip |
 
 #### CNS State Parser (src/compiler.go)
 | Function | Go Location | C11 Function | C11 Location | Status | Notes |
