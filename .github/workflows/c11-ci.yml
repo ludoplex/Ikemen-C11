@@ -18,6 +18,9 @@ on:
       - '.github/workflows/c11-ci.yml'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   build-test-linux:
     name: Build and Test C11 (Ubuntu)
