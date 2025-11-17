@@ -213,4 +213,67 @@ ikm_window_t* ikm_engine_get_window(ikm_engine_t* engine);
 ikm_input_t* ikm_engine_get_input(ikm_engine_t* engine);
 ikm_renderer_t* ikm_engine_get_renderer(ikm_engine_t* engine);
 
+/* === Image System (image.go) === */
+
+/* PalFX - Palette Effects */
+typedef struct ikm_palfx ikm_palfx_t;
+
+ikm_palfx_t* ikm_palfx_create(void);
+void ikm_palfx_destroy(ikm_palfx_t* pf);
+void ikm_palfx_clear(ikm_palfx_t* pf, bool allow_neg);
+
+/* Sprite */
+typedef struct ikm_sprite ikm_sprite_t;
+
+ikm_sprite_t* ikm_sprite_create(void);
+void ikm_sprite_destroy(ikm_sprite_t* s);
+bool ikm_sprite_is_blank(const ikm_sprite_t* s);
+void ikm_sprite_get_size(const ikm_sprite_t* s, uint16_t* w, uint16_t* h);
+void ikm_sprite_get_offset(const ikm_sprite_t* s, int16_t* x, int16_t* y);
+void ikm_sprite_get_group_number(const ikm_sprite_t* s, int16_t* g, int16_t* n);
+
+/* SFF - Sprite File Format */
+typedef struct ikm_sff ikm_sff_t;
+
+ikm_sff_t* ikm_sff_create(void);
+void ikm_sff_destroy(ikm_sff_t* sff);
+ikm_sff_t* ikm_sff_load(const char* filename);
+ikm_sprite_t* ikm_sff_get_sprite(ikm_sff_t* sff, int16_t group, int16_t number);
+
+/* Palette Management */
+typedef struct ikm_palette_list ikm_palette_list_t;
+
+ikm_palette_list_t* ikm_palette_list_create(void);
+void ikm_palette_list_destroy(ikm_palette_list_t* pl);
+int ikm_palette_list_add(ikm_palette_list_t* pl, const uint32_t* pal, size_t size);
+
+/* === Animation System (anim.go) === */
+
+/* Animation Frame */
+typedef struct ikm_anim_frame ikm_anim_frame_t;
+
+ikm_anim_frame_t* ikm_anim_frame_create(void);
+void ikm_anim_frame_destroy(ikm_anim_frame_t* af);
+ikm_anim_frame_t* ikm_anim_frame_parse(const char* line);
+
+/* Animation */
+typedef struct ikm_animation ikm_animation_t;
+
+ikm_animation_t* ikm_animation_create(ikm_sff_t* sff, ikm_palette_list_t* pal);
+void ikm_animation_destroy(ikm_animation_t* anim);
+int ikm_animation_add_frame(ikm_animation_t* anim, ikm_anim_frame_t* frame);
+void ikm_animation_reset(ikm_animation_t* anim);
+void ikm_animation_update(ikm_animation_t* anim);
+ikm_sprite_t* ikm_animation_get_sprite(const ikm_animation_t* anim);
+const ikm_anim_frame_t* ikm_animation_get_frame(const ikm_animation_t* anim);
+bool ikm_animation_has_looped(const ikm_animation_t* anim);
+
+/* AIR - Animation File Format */
+typedef struct ikm_air_file ikm_air_file_t;
+
+ikm_air_file_t* ikm_air_create(ikm_sff_t* sff, ikm_palette_list_t* pal);
+void ikm_air_destroy(ikm_air_file_t* air);
+ikm_air_file_t* ikm_air_load(const char* filename, ikm_sff_t* sff, ikm_palette_list_t* pal);
+ikm_animation_t* ikm_air_get_animation(ikm_air_file_t* air, int32_t action_no);
+
 #endif /* IKEMEN_ENGINE_H */
