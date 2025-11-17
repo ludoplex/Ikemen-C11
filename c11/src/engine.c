@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#include <stdbool.h>
 #include <stdarg.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -63,6 +64,7 @@ void ikm_set_error(const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
     vsnprintf(last_error_msg, MAX_ERROR_LENGTH, fmt, args);
+    last_error_msg[MAX_ERROR_LENGTH - 1] = '\0';
     va_end(args);
 }
 
@@ -234,10 +236,18 @@ int ikm_ini_get_int(ikm_ini_file_t* ini, const char* section, const char* key, i
 
 double ikm_ini_get_double(ikm_ini_file_t* ini, const char* section, const char* key, double default_value) {
     const char* value = ikm_ini_get(ini, section, key, NULL);
-    return value ? atof(value) : default_value;
+    if (value) {
+        char* endptr;
+        double result = strtod(value, &endptr);
+        if (endptr == value || *endptr != '\0') {
+            return default_value;
+        }
+        return result;
+    }
+    return default_value;
 }
 
-int ikm_ini_get_bool(ikm_ini_file_t* ini, const char* section, const char* key, int default_value) {
+bool ikm_ini_get_bool(ikm_ini_file_t* ini, const char* section, const char* key, bool default_value) {
     const char* value = ikm_ini_get(ini, section, key, NULL);
     if (!value) return default_value;
     return (strcasecmp(value, "true") == 0 || strcasecmp(value, "1") == 0 || strcasecmp(value, "yes") == 0);

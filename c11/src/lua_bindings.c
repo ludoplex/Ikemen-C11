@@ -40,19 +40,16 @@ static int lua_print(lua_State* L) {
 }
 
 static int lua_getGameWidth(lua_State* L) {
-    UNUSED(L);
     lua_pushinteger(L, 640);
     return 1;
 }
 
 static int lua_getGameHeight(lua_State* L) {
-    UNUSED(L);
     lua_pushinteger(L, 480);
     return 1;
 }
 
 static int lua_getFrameCount(lua_State* L) {
-    UNUSED(L);
     lua_pushinteger(L, 0);
     return 1;
 }
@@ -63,7 +60,6 @@ static int lua_refresh(lua_State* L) {
 }
 
 static int lua_commandGetState(lua_State* L) {
-    UNUSED(L);
     lua_pushboolean(L, 0);
     return 1;
 }
