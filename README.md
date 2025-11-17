@@ -16,6 +16,15 @@ Download the ZIP archive that matches your operating system and extract its cont
 On Windows, double-click `Ikemen_GO.exe`.
 On macOS or Linux, double-click `Ikemen_GO.command`.
 
+## C11 Refactor
+
+⚠️ **Work in Progress**: We are developing a C11 version of the Ikemen engine in parallel with the Go version.
+
+- **[C11 Roadmap](./C11-ROADMAP.md)** - Development plan, phases, and coding guidelines
+- **[AI Assistant Guidelines](./COPILOT_C11_GUIDELINES.md)** - Guidelines for GitHub Copilot and AI assistants
+
+**Important**: All C11 work is isolated in the `c11/` directory. The existing Go engine in `src/` remains unchanged and fully functional.
+
 ## Developing
 These instructions are for those interested in developing the Ikemen GO engine itself. Instructions for creating custom stages, fonts, characters and other resources can be found in the community forum.
 
