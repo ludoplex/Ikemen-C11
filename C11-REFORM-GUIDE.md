@@ -2,7 +2,29 @@
 
 ## Purpose
 
-This document establishes the guiding principles and rules for the C11 refactor of the Ikemen engine. The C11 implementation is being developed alongside the existing Go implementation to provide an alternative, high-performance engine core while maintaining full compatibility with MUGEN resources.
+This document establishes the guiding principles and rules for the C11 refactor of the Ikemen engine. The C11 implementation is being developed alongside the existing Go implementation to provide an alternative engine that replicates the complete functionality of Ikemen-GO while maintaining full compatibility with MUGEN resources.
+
+## What is Ikemen-GO?
+
+The Go reference implementation (`src/main.go`, `src/system.go`, and related files) is a **complete 2D fighting game engine** that includes:
+
+- **Window and rendering**: OpenGL 2.1/3.2 and Vulkan 1.3 support
+- **Lua scripting**: Game logic, menus, and flow control via Lua
+- **MUGEN compatibility**: Full support for SFF sprites, AIR animations, CNS states, CMD commands, DEF definitions
+- **Audio system**: Background music, sound effects, module music playback
+- **Input system**: Keyboard, joystick, gamepad with configurable mappings
+- **Network play**: Online matches with rollback netcode
+- **Game modes**: Arcade, Versus, Training, Survival, Team modes, and more
+- **Asset management**: Characters, stages, screenpacks, fonts, shaders
+- **Save system**: Replays, statistics, configuration persistence
+
+The C11 port aims to replicate **all of this functionality** incrementally over multiple development phases.
+
+## Current Implementation Status
+
+**Phase 1 (v0.1.0) - Foundation**: Asset directory validation only. This establishes the build system, testing infrastructure, and validates the environment is ready for future development. The C11 engine does NOT yet initialize windows, load sprites, or run matches—those come in future phases.
+
+See `c11/docs/ROADMAP.md` for the complete phase-by-phase development plan.
 
 ## Core Principles
 

@@ -1,13 +1,30 @@
 /*
  * Ikemen C11 Engine - Core Implementation
  * 
- * This file implements the core functionality of the Ikemen C11 engine,
- * focusing on version reporting and asset compatibility checks.
+ * Phase 1 (Foundation) implementation of the Ikemen-GO C11 port.
  * 
- * Implementation notes:
- * - Uses only C11 standard library and POSIX APIs
- * - Asset paths match those used by the Go reference implementation
- * - Designed for cross-platform compatibility (Linux, Windows, macOS)
+ * The Go reference (src/system.go, src/main.go) is a complete 2D fighting game
+ * engine with window management, Lua scripting, MUGEN asset loading, rendering,
+ * audio, input, and netplay. This C11 port will eventually replicate all of that
+ * functionality using only C11 and portable libraries.
+ * 
+ * Current Phase 1 provides:
+ * - Engine version identification
+ * - Asset directory structure validation
+ * - Foundation architecture for future components
+ * 
+ * The Go engine initializes in this order (see src/main.go:53, src/system.go:344):
+ * 1. Create save/ directories
+ * 2. Load config.ini (see src/config.go)
+ * 3. Check for main Lua script (system.def)
+ * 4. Initialize graphics window (OpenGL/Vulkan)
+ * 5. Initialize input system
+ * 6. Load shaders and rendering subsystem
+ * 7. Initialize audio (BGM, sound channels)
+ * 8. Execute Lua game logic
+ * 
+ * Future C11 phases will implement these subsystems incrementally.
+ * See c11/docs/ROADMAP.md for detailed plan.
  */
 
 #include "ikemen_engine.h"

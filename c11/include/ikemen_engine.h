@@ -1,22 +1,36 @@
 /*
  * Ikemen C11 Engine - Public API Header
  * 
- * This header provides the public interface for the Ikemen C11 engine.
- * The C11 implementation is designed to be compatible with existing MUGEN
- * assets and the Go reference implementation.
+ * This is Phase 1 (Foundation) of the C11 port of Ikemen-GO, a fighting game
+ * engine compatible with M.U.G.E.N resources.
  * 
- * Key design goals:
- * - Preserve compatibility with existing asset directory layout
- * - Use standard C11 and POSIX APIs only
- * - Provide validation against the canonical Go implementation's asset structure
+ * The Go reference implementation (src/main.go, src/system.go) is a complete
+ * fighting game engine with:
+ * - Graphics rendering (OpenGL/Vulkan)
+ * - Lua scripting for game logic
+ * - Character/stage management with MUGEN file format support (SFF, AIR, CNS)
+ * - Audio system (BGM, sound effects)
+ * - Input handling and netplay
+ * - Full match system with game modes
+ * 
+ * Current C11 Status (v0.1.0):
+ * This initial implementation provides:
+ * - Version identification
+ * - Asset directory validation (data/, external/, font/)
+ * - Foundation for future engine components
+ * 
+ * Next phases will add:
+ * - Configuration file parsing (INI format)
+ * - MUGEN file format support (SFF sprites, AIR animations, CNS states)
+ * - Rendering subsystem
+ * - Game loop and match management
+ * - Full feature parity with Go implementation
+ * 
+ * See c11/docs/ROADMAP.md for the complete development plan.
  */
 
 #ifndef IKEMEN_ENGINE_H
 #define IKEMEN_ENGINE_H
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 /* Version information */
 #define IKM_ENGINE_MAJOR 0
@@ -90,9 +104,5 @@ int ikm_check_asset_compatibility(const char* base_path);
  *          Do not free this string.
  */
 const char* ikm_get_last_error(void);
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif /* IKEMEN_ENGINE_H */
