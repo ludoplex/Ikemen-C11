@@ -7,6 +7,15 @@ Ikemen GO aims for backwards-compatibility on par with M.U.G.E.N version 1.1 Bet
 
 Refer to [our wiki](https://github.com/ikemen-engine/Ikemen-GO/wiki) to see a comprehensive list of new features that have been added in Ikemen GO.
 
+### User Notifications
+Ikemen GO includes a built-in notification system for displaying temporary messages to users. This system supports:
+- Multiple notification types (Info, Success, Warning, Error) with color coding
+- Configurable display duration and appearance
+- Lua API for easy integration
+- Automatic fade in/out animations
+
+See [docs/NOTIFICATIONS.md](./docs/NOTIFICATIONS.md) for detailed documentation and usage examples.
+
 ## Installing
 Ready to use builds for Windows, macOS and Linux can be found in the [releases section](https://github.com/ikemen-engine/Ikemen-GO/releases) of this repository. You can find nightly builds [here](https://github.com/ikemen-engine/Ikemen-GO/releases/tag/nightly) as well, which update on every commit.
 

@@ -143,18 +143,21 @@ type Config struct {
 		GamepadMappings  string   `ini:"GamepadMappings"`
 	} `ini:"Config"`
 	Debug struct {
-		AllowDebugMode      bool    `ini:"AllowDebugMode"`
-		AllowDebugKeys      bool    `ini:"AllowDebugKeys"`
-		ClipboardRows       int     `ini:"ClipboardRows"`
-		ConsoleRows         int     `ini:"ConsoleRows"`
-		ClsnDarken          bool    `ini:"ClsnDarken"`
-		Font                string  `ini:"Font"`
-		FontScale           float32 `ini:"FontScale"`
-		StartStage          string  `ini:"StartStage"`
-		ForceStageZoomout   float32 `ini:"ForceStageZoomout"`
-		ForceStageZoomin    float32 `ini:"ForceStageZoomin"`
-		KeepSpritesOnReload bool    `ini:"KeepSpritesOnReload"`
-		MacOSUseCommandKey  bool    `ini:"MacOSUseCommandKey"`
+		AllowDebugMode          bool    `ini:"AllowDebugMode"`
+		AllowDebugKeys          bool    `ini:"AllowDebugKeys"`
+		ClipboardRows           int     `ini:"ClipboardRows"`
+		ConsoleRows             int     `ini:"ConsoleRows"`
+		NotificationsEnabled    bool    `ini:"NotificationsEnabled"`
+		NotificationsMaxVisible int     `ini:"NotificationsMaxVisible"`
+		NotificationsSpacing    float32 `ini:"NotificationsSpacing"`
+		ClsnDarken              bool    `ini:"ClsnDarken"`
+		Font                    string  `ini:"Font"`
+		FontScale               float32 `ini:"FontScale"`
+		StartStage              string  `ini:"StartStage"`
+		ForceStageZoomout       float32 `ini:"ForceStageZoomout"`
+		ForceStageZoomin        float32 `ini:"ForceStageZoomin"`
+		KeepSpritesOnReload     bool    `ini:"KeepSpritesOnReload"`
+		MacOSUseCommandKey      bool    `ini:"MacOSUseCommandKey"`
 	} `ini:"Debug"`
 	Video struct {
 		RenderMode              string   `ini:"RenderMode"`

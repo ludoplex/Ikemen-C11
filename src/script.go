@@ -2240,6 +2240,82 @@ func systemScriptInit(l *lua.LState) {
 		fmt.Println(strArg(l, 1))
 		return 0
 	})
+	luaRegister(l, "notification", func(l *lua.LState) int {
+		message := strArg(l, 1)
+		notifType := NotifyInfo
+		duration := time.Second * 3
+
+		// Optional second argument: notification type (0=info, 1=success, 2=warning, 3=error)
+		if !nilArg(l, 2) {
+			typeNum := int(numArg(l, 2))
+			if typeNum >= 0 && typeNum <= 3 {
+				notifType = NotificationType(typeNum)
+			}
+		}
+
+		// Optional third argument: duration in seconds
+		if !nilArg(l, 3) {
+			durationSecs := numArg(l, 3)
+			if durationSecs > 0 {
+				duration = time.Duration(durationSecs * float64(time.Second))
+			}
+		}
+
+		sys.notificationMgr.AddNotification(message, notifType, duration)
+		return 0
+	})
+	luaRegister(l, "notificationInfo", func(l *lua.LState) int {
+		message := strArg(l, 1)
+		duration := time.Second * 3
+		if !nilArg(l, 2) {
+			durationSecs := numArg(l, 2)
+			if durationSecs > 0 {
+				duration = time.Duration(durationSecs * float64(time.Second))
+			}
+		}
+		sys.notificationMgr.AddNotification(message, NotifyInfo, duration)
+		return 0
+	})
+	luaRegister(l, "notificationSuccess", func(l *lua.LState) int {
+		message := strArg(l, 1)
+		duration := time.Second * 3
+		if !nilArg(l, 2) {
+			durationSecs := numArg(l, 2)
+			if durationSecs > 0 {
+				duration = time.Duration(durationSecs * float64(time.Second))
+			}
+		}
+		sys.notificationMgr.AddNotification(message, NotifySuccess, duration)
+		return 0
+	})
+	luaRegister(l, "notificationWarning", func(l *lua.LState) int {
+		message := strArg(l, 1)
+		duration := time.Second * 3
+		if !nilArg(l, 2) {
+			durationSecs := numArg(l, 2)
+			if durationSecs > 0 {
+				duration = time.Duration(durationSecs * float64(time.Second))
+			}
+		}
+		sys.notificationMgr.AddNotification(message, NotifyWarning, duration)
+		return 0
+	})
+	luaRegister(l, "notificationError", func(l *lua.LState) int {
+		message := strArg(l, 1)
+		duration := time.Second * 3
+		if !nilArg(l, 2) {
+			durationSecs := numArg(l, 2)
+			if durationSecs > 0 {
+				duration = time.Duration(durationSecs * float64(time.Second))
+			}
+		}
+		sys.notificationMgr.AddNotification(message, NotifyError, duration)
+		return 0
+	})
+	luaRegister(l, "clearNotifications", func(l *lua.LState) int {
+		sys.notificationMgr.Clear()
+		return 0
+	})
 	luaRegister(l, "puts", func(*lua.LState) int {
 		fmt.Println(strArg(l, 1))
 		return 0
