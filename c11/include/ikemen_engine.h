@@ -30,6 +30,9 @@
 #define IKM_MAX_VALUE_LENGTH 512
 #define IKM_MAX_SECTION_LENGTH 64
 
+/* Utility macros */
+#define UNUSED(x) (void)(x)
+
 /* Version information */
 int ikm_engine_major_version(void);
 int ikm_engine_minor_version(void);

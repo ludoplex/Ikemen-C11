@@ -3,7 +3,6 @@
  * Implements OpenGL 3.2 rendering matching Go's render_gl_gl32.go
  */
 
-#define UNUSED(x) (void)(x)
 #include "ikemen_engine.h"
 #include <GLFW/glfw3.h>
 #include <stdio.h>

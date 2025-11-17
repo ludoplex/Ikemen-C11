@@ -11,8 +11,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define UNUSED(x) (void)(x)
-
 /* Lua state wrapper */
 struct ikm_lua_state {
     lua_State* L;
