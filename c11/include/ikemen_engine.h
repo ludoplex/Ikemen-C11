@@ -110,6 +110,7 @@ void ikm_config_set_defaults(ikm_config_t* config);
 /* Engine initialization */
 typedef struct ikm_engine ikm_engine_t;
 
+
 ikm_engine_t* ikm_engine_create(void);
 void ikm_engine_destroy(ikm_engine_t* engine);
 int ikm_engine_initialize(ikm_engine_t* engine, const ikm_config_t* config);
@@ -140,6 +141,7 @@ int ikm_get_system_info(const char* base_path, ikm_system_info_t* info);
 
 /* Error handling */
 const char* ikm_get_last_error(void);
+void ikm_set_error(const char* fmt, ...);
 void ikm_clear_error(void);
 
 /* Logging */
@@ -228,5 +230,61 @@ int ikm_check_asset_compatibility(const char* base_path);
  *          Do not free this string.
  */
 const char* ikm_get_last_error(void);
+void ikm_set_error(const char* fmt, ...);
+
+
+/* Lua integration */
+typedef struct ikm_lua_state ikm_lua_state_t;
+
+ikm_lua_state_t* ikm_lua_create(void);
+void ikm_lua_destroy(ikm_lua_state_t* state);
+int ikm_lua_dofile(ikm_lua_state_t* state, const char* filename);
+int ikm_lua_dostring(ikm_lua_state_t* state, const char* code);
+void* ikm_lua_get_state(ikm_lua_state_t* state);
+
+/* Window management */
+typedef struct ikm_window ikm_window_t;
+
+ikm_window_t* ikm_window_create(const char* title, int width, int height, int fullscreen);
+void ikm_window_destroy(ikm_window_t* window);
+int ikm_window_should_close(ikm_window_t* window);
+void ikm_window_poll_events(ikm_window_t* window);
+void ikm_window_swap_buffers(ikm_window_t* window);
+void ikm_window_get_size(ikm_window_t* window, int* width, int* height);
+void ikm_window_set_title(ikm_window_t* window, const char* title);
+void* ikm_window_get_handle(ikm_window_t* window);
+
+/* Input system */
+typedef struct ikm_input ikm_input_t;
+
+ikm_input_t* ikm_input_create(ikm_window_t* window);
+void ikm_input_destroy(ikm_input_t* input);
+void ikm_input_update(ikm_input_t* input);
+int ikm_input_key_pressed(ikm_input_t* input, int key);
+int ikm_input_key_released(ikm_input_t* input, int key);
+int ikm_input_key_down(ikm_input_t* input, int key);
+void ikm_input_get_mouse_position(ikm_input_t* input, double* x, double* y);
+int ikm_input_mouse_button_pressed(ikm_input_t* input, int button);
+int ikm_input_command_state(ikm_input_t* input, const char* command);
+
+/* Renderer system */
+typedef struct ikm_renderer ikm_renderer_t;
+
+ikm_renderer_t* ikm_renderer_create(void);
+void ikm_renderer_destroy(ikm_renderer_t* renderer);
+int ikm_renderer_initialize(ikm_renderer_t* renderer, int width, int height);
+void ikm_renderer_begin_frame(ikm_renderer_t* renderer);
+void ikm_renderer_end_frame(ikm_renderer_t* renderer);
+void ikm_renderer_set_clear_color(ikm_renderer_t* renderer, float r, float g, float b, float a);
+void ikm_renderer_set_viewport(ikm_renderer_t* renderer, int x, int y, int width, int height);
+void ikm_renderer_draw_quad(ikm_renderer_t* renderer, float x, float y, float w, float h, 
+                            float r, float g, float b, float a);
+const char* ikm_renderer_get_name(ikm_renderer_t* renderer);
+
+/* Engine subsystem accessors */
+ikm_lua_state_t* ikm_engine_get_lua_state(ikm_engine_t* engine);
+ikm_window_t* ikm_engine_get_window(ikm_engine_t* engine);
+ikm_input_t* ikm_engine_get_input(ikm_engine_t* engine);
+ikm_renderer_t* ikm_engine_get_renderer(ikm_engine_t* engine);
 
 #endif /* IKEMEN_ENGINE_H */

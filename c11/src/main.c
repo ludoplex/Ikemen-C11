@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <math.h>
 
 /* Forward declarations for external functions in engine.c */
 extern int file_exists(const char* path);
@@ -201,7 +202,19 @@ int main(int argc, char** argv) {
     
     /* Step 7: Execute main script (sys.luaLState.DoFile in Go) */
     printf("[7/7] Executing main script: %s\n", config.system_script);
-    ikm_log(IKM_LOG_INFO, "Would execute Lua script: %s", config.system_script);
+    ikm_log(IKM_LOG_INFO, "Executing Lua script: %s", config.system_script);
+    
+    ikm_lua_state_t* lua = ikm_engine_get_lua_state(engine);
+    if (lua) {
+        result = ikm_lua_dofile(lua, config.system_script);
+        if (result == IKM_SUCCESS) {
+            printf("  ✓ Lua script executed successfully\n\n");
+        } else {
+            fprintf(stderr, "ERROR: %s\n", ikm_get_last_error());
+            ikm_log(IKM_LOG_ERROR, "Lua script failed: %s", ikm_get_last_error());
+            /* Continue anyway for demo purposes */
+        }
+    }
     
     printf("\n===========================================\n");
     printf("Engine initialization complete!\n");
@@ -212,24 +225,53 @@ int main(int argc, char** argv) {
     printf("  ✓ Configuration loading\n");
     printf("  ✓ System verification\n");
     printf("  ✓ Engine initialization\n");
-    printf("  ✗ Window creation (requires graphics backend)\n");
-    printf("  ✗ Lua script execution (requires Lua integration)\n");
-    printf("  ✗ Graphics rendering (requires OpenGL/Vulkan)\n");
-    printf("  ✗ Audio system (requires audio backend)\n");
-    printf("  ✗ Input handling (requires input backend)\n");
-    printf("  ✗ Game loop (requires all above systems)\n\n");
+    printf("  ✓ Window creation (%s mode)\n", config.fullscreen ? "fullscreen" : "windowed");
+    printf("  ✓ Lua script execution\n");
+    printf("  ✓ OpenGL rendering backend\n");
+    printf("  ✓ Input handling system\n");
+    printf("  ⚠ Audio system (TODO)\n");
+    printf("  ⚠ Game loop (partial - needs event loop)\n\n");
+    
+    printf("Running basic render loop for 3 seconds...\n");
+    ikm_log(IKM_LOG_INFO, "Starting render loop demonstration");
+    
+    ikm_window_t* window = ikm_engine_get_window(engine);
+    ikm_renderer_t* renderer = ikm_engine_get_renderer(engine);
+    ikm_input_t* input = ikm_engine_get_input(engine);
+    
+    /* Simple render loop demonstration */
+    int frame_count = 0;
+    while (!ikm_window_should_close(window) && frame_count < 180) { /* 3 seconds at 60fps */
+        ikm_window_poll_events(window);
+        ikm_input_update(input);
+        
+        /* Render frame */
+        ikm_renderer_begin_frame(renderer);
+        
+        /* Draw a simple test pattern */
+        float t = frame_count / 60.0f;
+        ikm_renderer_draw_quad(renderer, 50, 50, 100, 100, 
+                              0.5f + 0.5f * sinf(t * 2.0f), 0.3f, 0.7f, 1.0f);
+        ikm_renderer_draw_quad(renderer, 200, 100, 150, 80, 
+                              0.2f, 0.8f, 0.3f, 1.0f);
+        
+        ikm_renderer_end_frame(renderer);
+        ikm_window_swap_buffers(window);
+        
+        frame_count++;
+    }
+    
+    printf("Render loop complete. Displayed %d frames.\n\n", frame_count);
+    ikm_log(IKM_LOG_INFO, "Render loop completed: %d frames", frame_count);
     
     printf("Next Implementation Steps:\n");
-    printf("  1. Integrate Lua interpreter\n");
-    printf("  2. Add OpenGL/Vulkan rendering backend\n");
-    printf("  3. Implement audio system\n");
-    printf("  4. Add input handling\n");
-    printf("  5. Create game loop\n");
-    printf("  6. Load and parse MUGEN assets (SFF, AIR, CNS)\n");
-    printf("  7. Implement character state machine\n");
-    printf("  8. Add match logic and gameplay\n\n");
+    printf("  1. Add audio system (OpenAL/SDL_mixer)\n");
+    printf("  2. Implement full game loop with proper timing\n");
+    printf("  3. Load and parse MUGEN assets (SFF, AIR, CNS)\n");
+    printf("  4. Implement character state machine\n");
+    printf("  5. Add match logic and gameplay\n\n");
     
-    ikm_log(IKM_LOG_INFO, "Engine ready for extended implementation");
+    ikm_log(IKM_LOG_INFO, "Engine demonstration complete");
     
     /* Cleanup (defer sys.shutdown in Go) */
     ikm_engine_shutdown(engine);

@@ -24,6 +24,11 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 
+# Find required libraries
+find_package(Lua 5.1 REQUIRED)
+find_package(glfw3 REQUIRED)
+find_package(OpenGL REQUIRED)
+
 # Enable strict warnings on supported compilers
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     add_compile_options(-Wall -Wextra -Wpedantic -Werror)
@@ -45,10 +50,22 @@ include_directories(${PROJECT_SOURCE_DIR}/include)
 # Core engine library
 add_library(ikemen_engine STATIC
     src/engine.c
+    src/lua_bindings.c
+    src/window.c
+    src/input.c
+    src/renderer.c
 )
 
 target_include_directories(ikemen_engine PUBLIC
     ${PROJECT_SOURCE_DIR}/include
+    ${LUA_INCLUDE_DIR}
+)
+
+target_link_libraries(ikemen_engine PUBLIC
+    ${LUA_LIBRARIES}
+    glfw
+    ${OPENGL_LIBRARIES}
+    m
 )
 
 # Main executable

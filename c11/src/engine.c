@@ -49,11 +49,17 @@ struct ikm_engine {
     ikm_system_info_t system_info;
     int initialized;
     char base_path[IKM_MAX_PATH];
+    
+    /* Subsystems */
+    ikm_lua_state_t* lua_state;
+    ikm_window_t* window;
+    ikm_input_t* input;
+    ikm_renderer_t* renderer;
 };
 
 /* Internal helpers */
 
-static void set_error(const char* fmt, ...) {
+void ikm_set_error(const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
     vsnprintf(last_error_msg, MAX_ERROR_LENGTH, fmt, args);
@@ -75,7 +81,7 @@ static int create_dir(const char* path) {
         return 1;
     }
     if (mkdir(path, 0755) != 0 && errno != EEXIST) {
-        set_error("Failed to create directory %s: %s", path, strerror(errno));
+        ikm_set_error("Failed to create directory %s: %s", path, strerror(errno));
         return 0;
     }
     return 1;
@@ -134,14 +140,14 @@ ikm_ini_file_t* ikm_ini_load(const char* filepath) {
     
     fp = fopen(filepath, "r");
     if (!fp) {
-        set_error("Cannot open file: %s", filepath);
+        ikm_set_error("Cannot open file: %s", filepath);
         return NULL;
     }
     
     ini = (ikm_ini_file_t*)calloc(1, sizeof(ikm_ini_file_t));
     if (!ini) {
         fclose(fp);
-        set_error("Memory allocation failed");
+        ikm_set_error("Memory allocation failed");
         return NULL;
     }
     
@@ -240,7 +246,7 @@ int ikm_ini_get_bool(ikm_ini_file_t* ini, const char* section, const char* key, 
 int ikm_ini_save(ikm_ini_file_t* ini, const char* filepath) {
     FILE* fp = fopen(filepath, "w");
     if (!fp) {
-        set_error("Cannot write file: %s", filepath);
+        ikm_set_error("Cannot write file: %s", filepath);
         return IKM_ERROR_IO;
     }
     
@@ -332,7 +338,7 @@ int ikm_config_load(const char* filepath, ikm_config_t* config) {
 int ikm_config_save(const char* filepath, const ikm_config_t* config) {
     FILE* fp = fopen(filepath, "w");
     if (!fp) {
-        set_error("Cannot write config file: %s", filepath);
+        ikm_set_error("Cannot write config file: %s", filepath);
         return IKM_ERROR_IO;
     }
     
@@ -393,25 +399,25 @@ int ikm_verify_installation(const char* base_path) {
     
     join_path(path, sizeof(path), base, "data");
     if (!dir_exists(path)) {
-        set_error("Missing required directory: data/");
+        ikm_set_error("Missing required directory: data/");
         return IKM_ERROR_FILE_NOT_FOUND;
     }
     
     join_path(path, sizeof(path), base, "external");
     if (!dir_exists(path)) {
-        set_error("Missing required directory: external/");
+        ikm_set_error("Missing required directory: external/");
         return IKM_ERROR_FILE_NOT_FOUND;
     }
     
     join_path(path, sizeof(path), base, "font");
     if (!dir_exists(path)) {
-        set_error("Missing required directory: font/");
+        ikm_set_error("Missing required directory: font/");
         return IKM_ERROR_FILE_NOT_FOUND;
     }
     
     join_path(path, sizeof(path), base, "data/system.base.def");
     if (!file_exists(path)) {
-        set_error("Missing system definition file: data/system.base.def");
+        ikm_set_error("Missing system definition file: data/system.base.def");
         return IKM_ERROR_FILE_NOT_FOUND;
     }
     
@@ -426,7 +432,7 @@ int ikm_scan_directory(const char* path, char*** files, size_t* count) {
     *count = 0;
     *files = (char**)calloc(capacity, sizeof(char*));
     if (!*files) {
-        set_error("Memory allocation failed");
+        ikm_set_error("Memory allocation failed");
         return IKM_ERROR_MEMORY;
     }
     
@@ -434,7 +440,7 @@ int ikm_scan_directory(const char* path, char*** files, size_t* count) {
     if (!dir) {
         free(*files);
         *files = NULL;
-        set_error("Cannot open directory: %s", path);
+        ikm_set_error("Cannot open directory: %s", path);
         return IKM_ERROR_IO;
     }
     
@@ -486,7 +492,7 @@ int ikm_get_system_info(const char* base_path, ikm_system_info_t* info) {
 ikm_engine_t* ikm_engine_create(void) {
     ikm_engine_t* engine = (ikm_engine_t*)calloc(1, sizeof(ikm_engine_t));
     if (!engine) {
-        set_error("Memory allocation failed");
+        ikm_set_error("Memory allocation failed");
         return NULL;
     }
     return engine;
@@ -501,12 +507,12 @@ void ikm_engine_destroy(ikm_engine_t* engine) {
 
 int ikm_engine_initialize(ikm_engine_t* engine, const ikm_config_t* config) {
     if (!engine) {
-        set_error("Invalid engine instance");
+        ikm_set_error("Invalid engine instance");
         return IKM_ERROR_UNKNOWN;
     }
     
     if (engine->initialized) {
-        set_error("Engine already initialized");
+        ikm_set_error("Engine already initialized");
         return IKM_ERROR_UNKNOWN;
     }
     
@@ -516,6 +522,56 @@ int ikm_engine_initialize(ikm_engine_t* engine, const ikm_config_t* config) {
     int result = ikm_get_system_info(engine->base_path, &engine->system_info);
     if (result != IKM_SUCCESS) {
         return result;
+    }
+    
+    /* Initialize Lua interpreter */
+    ikm_log(IKM_LOG_INFO, "Initializing Lua interpreter...");
+    engine->lua_state = ikm_lua_create();
+    if (!engine->lua_state) {
+        ikm_set_error("Failed to create Lua state");
+        return IKM_ERROR_UNKNOWN;
+    }
+    
+    /* Create window */
+    ikm_log(IKM_LOG_INFO, "Creating window %dx%d...", config->width, config->height);
+    engine->window = ikm_window_create(
+        IKM_ENGINE_NAME,
+        config->width,
+        config->height,
+        config->fullscreen
+    );
+    if (!engine->window) {
+        ikm_lua_destroy(engine->lua_state);
+        return IKM_ERROR_UNKNOWN;
+    }
+    
+    /* Initialize renderer */
+    ikm_log(IKM_LOG_INFO, "Initializing renderer: %s", config->render_mode);
+    engine->renderer = ikm_renderer_create();
+    if (!engine->renderer) {
+        ikm_window_destroy(engine->window);
+        ikm_lua_destroy(engine->lua_state);
+        ikm_set_error("Failed to create renderer");
+        return IKM_ERROR_UNKNOWN;
+    }
+    
+    result = ikm_renderer_initialize(engine->renderer, config->width, config->height);
+    if (result != IKM_SUCCESS) {
+        ikm_renderer_destroy(engine->renderer);
+        ikm_window_destroy(engine->window);
+        ikm_lua_destroy(engine->lua_state);
+        return result;
+    }
+    
+    /* Initialize input system */
+    ikm_log(IKM_LOG_INFO, "Initializing input system...");
+    engine->input = ikm_input_create(engine->window);
+    if (!engine->input) {
+        ikm_renderer_destroy(engine->renderer);
+        ikm_window_destroy(engine->window);
+        ikm_lua_destroy(engine->lua_state);
+        ikm_set_error("Failed to create input system");
+        return IKM_ERROR_UNKNOWN;
     }
     
     engine->initialized = 1;
@@ -529,6 +585,28 @@ int ikm_engine_shutdown(ikm_engine_t* engine) {
     }
     
     ikm_log(IKM_LOG_INFO, "Engine shutting down");
+    
+    /* Cleanup subsystems in reverse order */
+    if (engine->input) {
+        ikm_input_destroy(engine->input);
+        engine->input = NULL;
+    }
+    
+    if (engine->renderer) {
+        ikm_renderer_destroy(engine->renderer);
+        engine->renderer = NULL;
+    }
+    
+    if (engine->window) {
+        ikm_window_destroy(engine->window);
+        engine->window = NULL;
+    }
+    
+    if (engine->lua_state) {
+        ikm_lua_destroy(engine->lua_state);
+        engine->lua_state = NULL;
+    }
+    
     engine->initialized = 0;
     return IKM_SUCCESS;
 }
@@ -581,4 +659,21 @@ void ikm_log_set_file(const char* filepath) {
         fclose(log_file);
     }
     log_file = fopen(filepath, "a");
+}
+
+/* Subsystem accessors */
+ikm_lua_state_t* ikm_engine_get_lua_state(ikm_engine_t* engine) {
+    return engine ? engine->lua_state : NULL;
+}
+
+ikm_window_t* ikm_engine_get_window(ikm_engine_t* engine) {
+    return engine ? engine->window : NULL;
+}
+
+ikm_input_t* ikm_engine_get_input(ikm_engine_t* engine) {
+    return engine ? engine->input : NULL;
+}
+
+ikm_renderer_t* ikm_engine_get_renderer(ikm_engine_t* engine) {
+    return engine ? engine->renderer : NULL;
 }
