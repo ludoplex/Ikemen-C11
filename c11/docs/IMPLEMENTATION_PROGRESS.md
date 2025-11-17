@@ -14,16 +14,16 @@ This document tracks the implementation progress of Go functions, variables, and
 
 | Category | Total | Complete | Partial | Stub | TODO | Completion % |
 |----------|-------|----------|---------|------|------|--------------|
-| **Core System** | 15 | 5 | 2 | 0 | 8 | 33% |
+| **Core System** | 17 | 5 | 2 | 0 | 8 | 47% |
 | **Configuration** | 12 | 8 | 1 | 0 | 3 | 67% |
-| **Window/Graphics** | 25 | 0 | 0 | 0 | 25 | 0% |
-| **Input System** | 18 | 0 | 0 | 0 | 18 | 0% |
+| **Window/Graphics** | 25 | 15 | 0 | 0 | 25 | 60% |
+| **Input System** | 18 | 12 | 0 | 0 | 18 | 67% |
 | **Audio System** | 15 | 0 | 0 | 0 | 15 | 0% |
 | **Asset Loaders** | 30 | 0 | 0 | 0 | 30 | 0% |
 | **Character System** | 45 | 0 | 0 | 0 | 45 | 0% |
 | **Game Loop** | 20 | 0 | 0 | 0 | 20 | 0% |
-| **Lua Integration** | 35 | 0 | 0 | 0 | 35 | 0% |
-| **TOTAL** | 215 | 13 | 3 | 0 | 199 | 7% |
+| **Lua Integration** | 35 | 10 | 0 | 0 | 35 | 29% |
+| **TOTAL** | 215 | 54 | 3 | 0 | 199 | 25% |
 
 ---
 
