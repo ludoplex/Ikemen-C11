@@ -183,17 +183,35 @@ ikm_anim_frame_t* ikm_anim_frame_parse(const char* line) {
     
     /* Parse X scale */
     if (part_count >= 8 && parts[7] && *parts[7]) {
-        af->xscale = (float)atof(parts[7]);
+        char *endptr = NULL;
+        double val = strtod(parts[7], &endptr);
+        if (endptr != parts[7] && *endptr == '\0') {
+            af->xscale = (float)val;
+        } else {
+            af->xscale = 1.0f; /* default value */
+        }
     }
     
     /* Parse Y scale */
     if (part_count >= 9 && parts[8] && *parts[8]) {
-        af->yscale = (float)atof(parts[8]);
+        char *endptr = NULL;
+        double val = strtod(parts[8], &endptr);
+        if (endptr != parts[8] && *endptr == '\0') {
+            af->yscale = (float)val;
+        } else {
+            af->yscale = 1.0f; /* default value */
+        }
     }
     
     /* Parse angle */
     if (part_count >= 10 && parts[9] && *parts[9]) {
-        af->angle = (float)atof(parts[9]);
+        char *endptr = NULL;
+        double val = strtod(parts[9], &endptr);
+        if (endptr != parts[9] && *endptr == '\0') {
+            af->angle = (float)val;
+        } else {
+            af->angle = 0.0f; /* default value */
+        }
     }
     
     return af;
