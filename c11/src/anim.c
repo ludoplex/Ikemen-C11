@@ -185,6 +185,10 @@ ikm_anim_frame_t* ikm_anim_frame_parse(const char* line) {
     if (part_count >= 8 && parts[7] && *parts[7]) {
         char *endptr = NULL;
         double val = strtod(parts[7], &endptr);
+        /* Skip trailing whitespace */
+        while (*endptr && isspace((unsigned char)*endptr)) {
+            endptr++;
+        }
         if (endptr != parts[7] && *endptr == '\0') {
             af->xscale = (float)val;
         } else {
@@ -196,6 +200,10 @@ ikm_anim_frame_t* ikm_anim_frame_parse(const char* line) {
     if (part_count >= 9 && parts[8] && *parts[8]) {
         char *endptr = NULL;
         double val = strtod(parts[8], &endptr);
+        /* Skip trailing whitespace */
+        while (*endptr && isspace((unsigned char)*endptr)) {
+            endptr++;
+        }
         if (endptr != parts[8] && *endptr == '\0') {
             af->yscale = (float)val;
         } else {
@@ -207,6 +215,10 @@ ikm_anim_frame_t* ikm_anim_frame_parse(const char* line) {
     if (part_count >= 10 && parts[9] && *parts[9]) {
         char *endptr = NULL;
         double val = strtod(parts[9], &endptr);
+        /* Skip trailing whitespace */
+        while (*endptr && isspace((unsigned char)*endptr)) {
+            endptr++;
+        }
         if (endptr != parts[9] && *endptr == '\0') {
             af->angle = (float)val;
         } else {
