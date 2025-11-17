@@ -1,0 +1,237 @@
+name: C11 Build and Test
+
+# Trigger this workflow when C11 files change or on pull requests
+on:
+  push:
+    branches: [ develop, main, master ]
+    paths:
+      - 'c11/**'
+      - 'C11-REFORM-GUIDE.md'
+      - 'COPILOT_C11_POLICY.md'
+      - '.github/workflows/c11-ci.yml'
+  pull_request:
+    branches: [ develop, main, master ]
+    paths:
+      - 'c11/**'
+      - 'C11-REFORM-GUIDE.md'
+      - 'COPILOT_C11_POLICY.md'
+      - '.github/workflows/c11-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test-linux:
+    name: Build and Test C11 (Ubuntu)
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Install build dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake build-essential
+    
+    - name: Configure CMake
+      working-directory: c11
+      run: |
+        mkdir -p build
+        cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Release
+    
+    - name: Build C11 engine
+      working-directory: c11/build
+      run: cmake --build . --config Release
+    
+    - name: Run tests
+      working-directory: c11/build
+      run: ctest --output-on-failure --build-config Release
+    
+    - name: Run asset compatibility check
+      working-directory: c11/build
+      run: |
+        echo "Running asset compatibility check against repository root..."
+        ./bin/ikemen_c11 ../..
+    
+    - name: Display build artifacts
+      run: |
+        echo "Build artifacts:"
+        ls -lh c11/build/bin/
+        ls -lh c11/build/lib/
+
+  build-test-macos:
+    name: Build and Test C11 (macOS)
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Install build dependencies
+      run: |
+        brew install cmake
+    
+    - name: Configure CMake
+      working-directory: c11
+      run: |
+        mkdir -p build
+        cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Release
+    
+    - name: Build C11 engine
+      working-directory: c11/build
+      run: cmake --build . --config Release
+    
+    - name: Run tests
+      working-directory: c11/build
+      run: ctest --output-on-failure --build-config Release
+    
+    - name: Run asset compatibility check
+      working-directory: c11/build
+      run: |
+        echo "Running asset compatibility check against repository root..."
+        ./bin/ikemen_c11 ../..
+
+  build-test-windows:
+    name: Build and Test C11 (Windows)
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Setup MSVC
+      uses: microsoft/setup-msbuild@v2
+    
+    - name: Configure CMake
+      working-directory: c11
+      run: |
+        mkdir build
+        cd build
+        cmake .. -G "Visual Studio 17 2022" -A x64
+    
+    - name: Build C11 engine
+      working-directory: c11/build
+      run: cmake --build . --config Release
+    
+    - name: Run tests
+      working-directory: c11/build
+      run: ctest -C Release --output-on-failure
+    
+    - name: Run asset compatibility check
+      working-directory: c11/build
+      run: |
+        echo "Running asset compatibility check against repository root..."
+        .\bin\Release\ikemen_c11.exe ..\..
+
+  code-quality:
+    name: C11 Code Quality Checks
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Check C11 directory structure
+      run: |
+        echo "Verifying C11 directory structure..."
+        test -d c11/src || { echo "Missing c11/src"; exit 1; }
+        test -d c11/include || { echo "Missing c11/include"; exit 1; }
+        test -d c11/tests || { echo "Missing c11/tests"; exit 1; }
+        test -d c11/docs || { echo "Missing c11/docs"; exit 1; }
+        test -f c11/CMakeLists.txt || { echo "Missing c11/CMakeLists.txt"; exit 1; }
+        echo "✓ Directory structure valid"
+    
+    - name: Verify no C files outside c11/
+      run: |
+        echo "Checking for C source files outside c11/ directory..."
+        # Look for .c files outside c11/ (excluding .git and external)
+        if find . -name "*.c" -not -path "./c11/*" -not -path "./.git/*" -not -path "./external/*" | grep -q .; then
+          echo "Error: Found C source files outside c11/ directory:"
+          find . -name "*.c" -not -path "./c11/*" -not -path "./.git/*" -not -path "./external/*"
+          exit 1
+        fi
+        echo "✓ No C files outside c11/"
+    
+    - name: Check for placeholder code
+      run: |
+        echo "Checking for placeholder or TODO-only implementations..."
+        # Look for files that are mostly TODOs or placeholders
+        if grep -r "TODO.*implement" c11/src/ | grep -v "future enhancement" | head -5; then
+          echo "Warning: Found TODO placeholders in implementation files"
+          echo "All C11 code should be functional, not placeholder"
+          # Don't fail on this, just warn
+        fi
+        echo "✓ Placeholder check complete"
+    
+    - name: Verify documentation exists
+      run: |
+        echo "Checking for required documentation..."
+        test -f C11-REFORM-GUIDE.md || { echo "Missing C11-REFORM-GUIDE.md"; exit 1; }
+        test -f COPILOT_C11_POLICY.md || { echo "Missing COPILOT_C11_POLICY.md"; exit 1; }
+        test -f c11/docs/ROADMAP.md || { echo "Missing c11/docs/ROADMAP.md"; exit 1; }
+        echo "✓ Documentation files present"
+    
+    - name: Count test coverage
+      run: |
+        echo "Test file count:"
+        find c11/tests -name "test_*.c" | wc -l
+        echo "Source file count:"
+        find c11/src -name "*.c" | wc -l
+        echo "(Ideally, test count should be >= source count)"
+
+  asset-compatibility:
+    name: Asset Compatibility Integration
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake build-essential
+    
+    - name: Build C11 engine
+      working-directory: c11
+      run: |
+        mkdir -p build
+        cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Release
+        cmake --build .
+    
+    - name: Verify asset directory structure
+      run: |
+        echo "Checking for required asset directories..."
+        test -d data || { echo "Missing data/ directory"; exit 1; }
+        test -d external || { echo "Missing external/ directory"; exit 1; }
+        test -d font || { echo "Missing font/ directory"; exit 1; }
+        echo "✓ All required asset directories present"
+    
+    - name: List data directory contents
+      run: |
+        echo "Contents of data/ directory:"
+        ls -la data/ | head -20
+    
+    - name: Run C11 asset compatibility check
+      working-directory: c11/build
+      run: |
+        echo "Running C11 engine asset compatibility check..."
+        ./bin/ikemen_c11 ../..
+        echo "✓ C11 asset compatibility check passed"
+    
+    - name: Verify asset files are unchanged
+      run: |
+        echo "Verifying C11 development has not modified shared assets..."
+        # This checks that data/, external/, and font/ haven't been modified
+        # by C11 development (should only be changed by Go engine or asset updates)
+        git diff --exit-code data/ external/ font/ || {
+          echo "Error: C11 development has modified shared asset directories"
+          echo "Assets should not be changed to accommodate C11"
+          exit 1
+        }
+        echo "✓ Shared assets unchanged"

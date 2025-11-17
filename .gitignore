@@ -57,3 +57,19 @@ build/winres/
 *.exe
 *.dll
 external/script/version
+
+# C11 build artifacts
+c11/build/
+c11/bin/
+c11/lib/
+*.o
+*.a
+*.so
+*.dylib
+
+# C11 backup and temporary files
+*.bak
+*_old.c
+*_old.h
+*_fix.c
+*_fix.h
