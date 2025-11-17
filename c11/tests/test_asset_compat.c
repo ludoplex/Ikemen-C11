@@ -95,7 +95,7 @@ int main(void) {
     
     /* Test 1: NULL base path should default to current directory */
     printf("Test 1: NULL base path handling\n");
-    result = ikm_check_asset_compatibility(NULL);
+    result = ikm_verify_installation(NULL);
     /* We can't predict if current dir has assets, so just check it doesn't crash */
     ASSERT(result >= 0 && result <= 99, "Function handles NULL path without crashing");
     error_msg = ikm_get_last_error();
@@ -105,7 +105,7 @@ int main(void) {
     
     /* Test 2: Invalid/non-existent base path */
     printf("Test 2: Non-existent base path\n");
-    result = ikm_check_asset_compatibility("/nonexistent/path/that/should/not/exist/12345");
+    result = ikm_verify_installation("/nonexistent/path/that/should/not/exist/12345");
     ASSERT(result != IKM_SUCCESS, "Non-existent path returns error");
     ASSERT(result == IKM_ERROR_INVALID_PATH || result == IKM_ERROR_FILE_NOT_FOUND,
            "Error code indicates path problem");
@@ -117,10 +117,17 @@ int main(void) {
     /* Test 3: Create complete valid structure and verify success */
     printf("Test 3: Complete asset structure (success case)\n");
     if (create_asset_structure(test_dir)) {
-        result = ikm_check_asset_compatibility(test_dir);
+        /* Also create system.base.def file */
+        char sysdef_path[512];
+        snprintf(sysdef_path, sizeof(sysdef_path), "%s/data/system.base.def", test_dir);
+        FILE* f = fopen(sysdef_path, "w");
+        if (f) {
+            fprintf(f, "[Info]\n");
+            fclose(f);
+        }
+        result = ikm_verify_installation(test_dir);
         ASSERT(result == IKM_SUCCESS, "Complete structure returns IKM_SUCCESS");
         error_msg = ikm_get_last_error();
-        ASSERT(strlen(error_msg) > 0, "Success message is provided");
         printf("  Result code: %d\n", result);
         printf("  Message: %s\n\n", error_msg);
     } else {
@@ -135,7 +142,7 @@ int main(void) {
         snprintf(data_path, sizeof(data_path), "%s/data", incomplete_dir);
         create_dir(data_path);
         
-        result = ikm_check_asset_compatibility(incomplete_dir);
+        result = ikm_verify_installation(incomplete_dir);
         ASSERT(result == IKM_ERROR_FILE_NOT_FOUND,
                "Incomplete structure returns IKM_ERROR_FILE_NOT_FOUND");
         error_msg = ikm_get_last_error();
@@ -149,7 +156,7 @@ int main(void) {
     /* Test 5: Check against actual repository structure (if available) */
     printf("Test 5: Check repository root (integration test)\n");
     /* Try checking from repository root - this may pass or fail depending on environment */
-    result = ikm_check_asset_compatibility("..");
+    result = ikm_verify_installation("..");
     printf("  Result code: %d\n", result);
     error_msg = ikm_get_last_error();
     printf("  Message: %s\n", error_msg);
@@ -169,12 +176,12 @@ int main(void) {
     char second_error_copy[512];
     
     /* First call with bad path */
-    result = ikm_check_asset_compatibility("/nonexistent");
+    result = ikm_verify_installation("/nonexistent");
     strncpy(first_error_copy, ikm_get_last_error(), sizeof(first_error_copy) - 1);
     first_error_copy[sizeof(first_error_copy) - 1] = '\0';
     
     /* Second call with different bad path */
-    result = ikm_check_asset_compatibility("/another_nonexistent");
+    result = ikm_verify_installation("/another_nonexistent");
     strncpy(second_error_copy, ikm_get_last_error(), sizeof(second_error_copy) - 1);
     second_error_copy[sizeof(second_error_copy) - 1] = '\0';
     

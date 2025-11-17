@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <stdarg.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -18,8 +19,21 @@
 #include <direct.h>
 #define mkdir(path, mode) _mkdir(path)
 #define PATH_SEP '\\'
+#define strcasecmp _stricmp
 #else
 #define PATH_SEP '/'
+/* Provide strdup if not available */
+#ifndef strdup
+static char* my_strdup(const char* s) {
+    size_t len = strlen(s) + 1;
+    char* new_str = (char*)malloc(len);
+    if (new_str) {
+        memcpy(new_str, s, len);
+    }
+    return new_str;
+}
+#define strdup my_strdup
+#endif
 #endif
 
 #define MAX_ERROR_LENGTH 1024
@@ -46,12 +60,12 @@ static void set_error(const char* fmt, ...) {
     va_end(args);
 }
 
-static int file_exists(const char* path) {
+int file_exists(const char* path) {
     struct stat st;
     return (stat(path, &st) == 0 && S_ISREG(st.st_mode));
 }
 
-static int dir_exists(const char* path) {
+int dir_exists(const char* path) {
     struct stat st;
     return (stat(path, &st) == 0 && S_ISDIR(st.st_mode));
 }

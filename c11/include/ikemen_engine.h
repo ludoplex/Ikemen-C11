@@ -120,6 +120,8 @@ int ikm_create_directories(const char* base_path);
 int ikm_verify_installation(const char* base_path);
 int ikm_scan_directory(const char* path, char*** files, size_t* count);
 void ikm_free_file_list(char** files, size_t count);
+int file_exists(const char* path);
+int dir_exists(const char* path);
 
 /* System information */
 typedef struct {
@@ -153,7 +155,6 @@ void ikm_log(ikm_log_level_t level, const char* format, ...);
 void ikm_log_set_level(ikm_log_level_t level);
 void ikm_log_set_file(const char* filepath);
 
-#endif /* IKEMEN_ENGINE_H */
 
 /* Version information */
 #define IKM_ENGINE_MAJOR 0
