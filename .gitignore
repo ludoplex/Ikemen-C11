@@ -57,3 +57,10 @@ build/winres/
 *.exe
 *.dll
 external/script/version
+
+# C11 build artifacts
+c11/build/
+c11/**/*.o
+c11/**/*.a
+c11/**/*.so
+c11/**/*.dylib

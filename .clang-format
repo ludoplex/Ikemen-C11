@@ -1,0 +1,41 @@
+---
+# Ikemen C11 Code Style Configuration
+BasedOnStyle: LLVM
+Language: Cpp
+
+# Indentation
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 100
+
+# Braces
+BreakBeforeBraces: Linux
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+
+# Spacing
+SpaceAfterCStyleCast: true
+SpaceBeforeParens: ControlStatements
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+
+# Alignment
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
+AlignTrailingComments: true
+PointerAlignment: Right
+DerivePointerAlignment: false
+
+# Line breaking
+AllowAllParametersOfDeclarationOnNextLine: true
+BinPackParameters: true
+MaxEmptyLinesToKeep: 2
+
+# Comments
+ReflowComments: true
+
+# Includes
+SortIncludes: true
+IncludeBlocks: Regroup

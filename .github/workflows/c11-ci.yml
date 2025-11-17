@@ -1,0 +1,165 @@
+name: C11 CI
+
+on:
+  push:
+    branches: [ develop, release ]
+    paths:
+      - 'c11/**'
+      - '.github/workflows/c11-ci.yml'
+      - 'C11-ROADMAP.md'
+      - 'COPILOT_C11_GUIDELINES.md'
+  pull_request:
+    branches: [ develop, release ]
+    paths:
+      - 'c11/**'
+      - '.github/workflows/c11-ci.yml'
+      - 'C11-ROADMAP.md'
+      - 'COPILOT_C11_GUIDELINES.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Build and Test C11 (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-2022, macos-14]
+        build_type: [Debug, Release]
+        include:
+          - os: ubuntu-22.04
+            cmake_generator: "Unix Makefiles"
+          - os: windows-2022
+            cmake_generator: "Visual Studio 17 2022"
+          - os: macos-14
+            cmake_generator: "Unix Makefiles"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake gcc g++ make
+
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install cmake
+
+      - name: Cache CMake build directory
+        uses: actions/cache@v4
+        with:
+          path: c11/build
+          key: ${{ runner.os }}-cmake-${{ matrix.build_type }}-${{ hashFiles('c11/CMakeLists.txt', 'c11/**/CMakeLists.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-cmake-${{ matrix.build_type }}-
+            ${{ runner.os }}-cmake-
+
+      - name: Configure CMake
+        run: |
+          cmake -S c11 -B c11/build -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -G "${{ matrix.cmake_generator }}"
+
+      - name: Build
+        run: |
+          cmake --build c11/build --config ${{ matrix.build_type }} --parallel
+
+      - name: Run tests
+        run: |
+          cd c11/build
+          ctest --output-on-failure --build-config ${{ matrix.build_type }}
+
+      - name: Run scaffold executable (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          c11/build/bin/ikemen_c11
+
+      - name: Run scaffold executable (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          c11/build/bin/${{ matrix.build_type }}/ikemen_c11.exe
+
+      - name: Upload build artifacts
+        if: matrix.build_type == 'Release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ikemen-c11-${{ runner.os }}-${{ matrix.build_type }}
+          path: |
+            c11/build/bin/
+          retention-days: 7
+
+  lint:
+    name: Code Style and Linting
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install clang-format
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format
+
+      - name: Check C11 code formatting
+        run: |
+          find c11/src c11/include c11/tests -name '*.c' -o -name '*.h' | \
+            xargs clang-format --dry-run --Werror --style=file:.clang-format 2>&1 | tee format-check.log || true
+          if grep -q "warning:" format-check.log; then
+            echo "::warning::Code formatting issues found. Run clang-format to fix."
+          fi
+
+  sanitizers:
+    name: Sanitizers (Ubuntu)
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        sanitizer: [address, undefined]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake gcc g++ make
+
+      - name: Configure CMake with Sanitizers
+        run: |
+          cmake -S c11 -B c11/build \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DENABLE_ASAN=${{ matrix.sanitizer == 'address' && 'ON' || 'OFF' }} \
+            -DENABLE_UBSAN=${{ matrix.sanitizer == 'undefined' && 'ON' || 'OFF' }}
+
+      - name: Build
+        run: |
+          cmake --build c11/build --parallel
+
+      - name: Run tests with sanitizers
+        run: |
+          cd c11/build
+          ctest --output-on-failure
+
+  summary:
+    name: CI Summary
+    runs-on: ubuntu-22.04
+    needs: [build-and-test, lint, sanitizers]
+    if: always()
+    steps:
+      - name: Check results
+        run: |
+          echo "Build and Test: ${{ needs.build-and-test.result }}"
+          echo "Lint: ${{ needs.lint.result }}"
+          echo "Sanitizers: ${{ needs.sanitizers.result }}"
+          
+          if [ "${{ needs.build-and-test.result }}" != "success" ] || \
+             [ "${{ needs.lint.result }}" != "success" ] || \
+             [ "${{ needs.sanitizers.result }}" != "success" ]; then
+            echo "::error::One or more CI jobs failed"
+            exit 1
+          fi
+          echo "✅ All C11 CI checks passed!"
