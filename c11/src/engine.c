@@ -239,6 +239,10 @@ double ikm_ini_get_double(ikm_ini_file_t* ini, const char* section, const char* 
     if (value) {
         char* endptr;
         double result = strtod(value, &endptr);
+        // Skip trailing whitespace after the parsed number
+        while (*endptr && isspace((unsigned char)*endptr)) {
+            endptr++;
+        }
         if (endptr == value || *endptr != '\0') {
             return default_value;
         }
