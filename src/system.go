@@ -81,6 +81,7 @@ var sys = System{
 	arenaSaveMap:         make(map[int]*arena.Arena),
 	arenaLoadMap:         make(map[int]*arena.Arena),
 	debugAccel:           1, // TODO: We probably shouldn't rely on this being initialized to 1
+	notificationMgr:      NewNotificationManager(),
 	// Match loop variables
 	autolvmul: math.Pow(2, 1.0/12), // Handicap levels for Random Test mode
 }
@@ -286,6 +287,7 @@ type System struct {
 	maxPowerMode      bool
 	clsnText          []ClsnText
 	consoleText       []string
+	notificationMgr   *NotificationManager
 	luaLState         *lua.LState
 	statusLFunc       *lua.LFunction
 	listLFunc         []*lua.LFunction
@@ -906,6 +908,11 @@ func (s *System) renderFrame() {
 	// Render debug elements
 	if !s.frameSkip && s.debugDisplay {
 		s.drawDebugText()
+	}
+
+	// Render user notifications (always visible, not just in debug mode)
+	if !s.frameSkip {
+		s.drawNotifications()
 	}
 }
 
@@ -2606,6 +2613,66 @@ func (s *System) drawDebugText() {
 			s.debugFont.palfx, s.debugFont.frgba)
 	}
 	//}
+}
+
+func (s *System) drawNotifications() {
+	if s.debugFont == nil || s.notificationMgr == nil || !s.cfg.Debug.NotificationsEnabled {
+		return
+	}
+
+	// Update notification manager to remove expired notifications
+	s.notificationMgr.Update()
+
+	notifications := s.notificationMgr.GetVisibleNotifications()
+	if len(notifications) == 0 {
+		return
+	}
+
+	// Start position: top-right of the screen with some padding
+	startX := float32(s.gameWidth) - 10
+	startY := 10.0
+
+	for i, notif := range notifications {
+		opacity := s.notificationMgr.GetOpacity(notif)
+		if opacity <= 0 {
+			continue
+		}
+
+		// Calculate position for this notification
+		y := startY + float32(i)*s.notificationMgr.spacing
+
+		// Set color based on notification type
+		switch notif.Type {
+		case NotifyInfo:
+			s.debugFont.SetColor(200, 200, 255)
+		case NotifySuccess:
+			s.debugFont.SetColor(100, 255, 100)
+		case NotifyWarning:
+			s.debugFont.SetColor(255, 200, 100)
+		case NotifyError:
+			s.debugFont.SetColor(255, 100, 100)
+		default:
+			s.debugFont.SetColor(255, 255, 255)
+		}
+
+		// Apply opacity
+		s.debugFont.frgba[3] = int32(255 * opacity)
+
+		// Calculate text width to right-align
+		textWidth := float32(0)
+		for _, r := range notif.Message {
+			textWidth += float32(s.debugFont.fnt.CharWidth(r, 0)+s.debugFont.fnt.Spacing[0]) * s.debugFont.xscl / s.widthScale
+		}
+
+		// Draw notification text (right-aligned)
+		x := startX - textWidth
+		s.debugFont.fnt.Print(notif.Message, x, y, s.debugFont.xscl/s.widthScale,
+			s.debugFont.yscl/s.heightScale, 0, Rotation{0, 0, 0}, 0, 1, &s.scrrect,
+			s.debugFont.palfx, s.debugFont.frgba)
+	}
+
+	// Reset opacity
+	s.debugFont.frgba[3] = 255
 }
 
 // Starts and runs gameplay

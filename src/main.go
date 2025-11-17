@@ -90,6 +90,11 @@ func main() {
 		chk(err)
 	} else {
 		sys.cfg = *cfg
+		// Configure notification manager with settings from config
+		sys.notificationMgr.Configure(
+			sys.cfg.Debug.NotificationsMaxVisible,
+			sys.cfg.Debug.NotificationsSpacing,
+		)
 	}
 
 	//os.Mkdir("debug", os.ModeSticky|0755)
