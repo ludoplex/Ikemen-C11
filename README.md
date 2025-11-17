@@ -29,6 +29,15 @@ In order to run the compiled Ikemen GO executable, you will need to download the
 ## Troubleshooting
 If you run into any issues with Ikemen Go, you can report it on our [issue tracker](https://github.com/ikemen-engine/Ikemen-GO/issues). It is recommend to read [this page](https://github.com/ikemen-engine/Ikemen-GO/blob/develop/CONTRIBUTING.md) before submitting a bug report.
 
+## C11 Refactoring (Experimental)
+An experimental C11 implementation of the engine is being developed in the [`c11/`](c11/) directory. This is a long-term refactoring effort that aims to gradually port the engine to C11 while maintaining the existing Go implementation.
+
+**Status**: Early scaffolding - not yet functional for gameplay.
+
+For more information, see:
+- [C11 README](c11/README.md) for build instructions
+- [COPILOT_REFACTORING_GUIDE.md](COPILOT_REFACTORING_GUIDE.md) for contribution guidelines
+
 ## References
 - [The original reposity of Ikemen GO.](https://osdn.net/users/supersuehiro/pf/ikemen_go/) This project was forked from this repository due to its original author seemingly abandoning the project.
 

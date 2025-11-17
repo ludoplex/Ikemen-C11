@@ -1,0 +1,153 @@
+name: C11 Build and Test
+
+on:
+  push:
+    branches: [ develop, master, 'copilot/**' ]
+    paths:
+      - 'c11/**'
+      - '.github/workflows/c11-build.yml'
+  pull_request:
+    branches: [ develop, master ]
+    paths:
+      - 'c11/**'
+      - '.github/workflows/c11-build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Build C11 (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04]
+        # TODO: Add Windows and macOS support
+        # os: [ubuntu-22.04, windows-2022, macos-14]
+        include:
+          - os: ubuntu-22.04
+            cmake_generator: "Unix Makefiles"
+            build_type: Release
+          # TODO: Uncomment when adding Windows support
+          # - os: windows-2022
+          #   cmake_generator: "Visual Studio 17 2022"
+          #   build_type: Release
+          # TODO: Uncomment when adding macOS support
+          # - os: macos-14
+          #   cmake_generator: "Unix Makefiles"
+          #   build_type: Release
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+      
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            ninja-build \
+            gcc \
+            g++
+      
+      # TODO: Add Windows dependencies installation
+      # - name: Install dependencies (Windows)
+      #   if: runner.os == 'Windows'
+      #   run: |
+      #     choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System'
+      
+      # TODO: Add macOS dependencies installation
+      # - name: Install dependencies (macOS)
+      #   if: runner.os == 'macOS'
+      #   run: |
+      #     brew install cmake ninja
+      
+      - name: Configure CMake
+        run: |
+          cmake -S c11 -B c11/build \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -G "${{ matrix.cmake_generator }}"
+      
+      - name: Build
+        run: cmake --build c11/build --config ${{ matrix.build_type }}
+      
+      - name: Run tests
+        run: ctest --test-dir c11/build --config ${{ matrix.build_type }} --output-on-failure --verbose
+      
+      - name: Run executable (smoke test)
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            ./c11/build/bin/ikemen_c11
+          fi
+        shell: bash
+      
+      # TODO: Add artifact upload for builds
+      # - name: Upload artifacts
+      #   if: matrix.os == 'ubuntu-22.04'
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: ikemen-c11-${{ matrix.os }}
+      #     path: c11/build/bin/ikemen_c11
+      #     retention-days: 7
+
+  # TODO: Add code coverage job
+  # coverage:
+  #   name: Code Coverage
+  #   runs-on: ubuntu-22.04
+  #   steps:
+  #     - uses: actions/checkout@v5
+  #     - name: Install dependencies
+  #       run: |
+  #         sudo apt-get update
+  #         sudo apt-get install -y build-essential cmake gcovr lcov
+  #     - name: Configure with coverage
+  #       run: |
+  #         cmake -S c11 -B c11/build \
+  #           -DCMAKE_BUILD_TYPE=Debug \
+  #           -DCMAKE_C_FLAGS="--coverage -fprofile-arcs -ftest-coverage"
+  #     - name: Build and test
+  #       run: |
+  #         cmake --build c11/build
+  #         ctest --test-dir c11/build --output-on-failure
+  #     - name: Generate coverage report
+  #       run: |
+  #         gcovr -r c11 --html --html-details -o coverage.html
+  #     - name: Upload coverage
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: coverage-report
+  #         path: coverage.html
+
+  # TODO: Add static analysis job
+  # static-analysis:
+  #   name: Static Analysis
+  #   runs-on: ubuntu-22.04
+  #   steps:
+  #     - uses: actions/checkout@v5
+  #     - name: Install clang-tidy
+  #       run: sudo apt-get update && sudo apt-get install -y clang-tidy
+  #     - name: Run clang-tidy
+  #       run: |
+  #         cmake -S c11 -B c11/build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+  #         clang-tidy c11/src/*.c -p c11/build
+
+  status-check:
+    name: C11 Build Status
+    if: always()
+    needs: [build-and-test]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check build status
+        run: |
+          if [ "${{ needs.build-and-test.result }}" = "success" ]; then
+            echo "✅ C11 build and tests passed"
+            exit 0
+          else
+            echo "❌ C11 build or tests failed"
+            exit 1
+          fi

@@ -57,3 +57,8 @@ build/winres/
 *.exe
 *.dll
 external/script/version
+
+# C11 build artifacts
+c11/build/
+c11/cmake-build-*/
+
