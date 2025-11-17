@@ -5,6 +5,7 @@ go 1.20
 replace github.com/gopxl/beep/v2 => github.com/gopxl/beep/v2 v2.1.1-0.20240921133731-defe79638e99
 
 require (
+	github.com/Eiton/vulkan v0.0.0-20251024132427-732131af8682
 	github.com/assemblaj/ggpo v0.0.0-20241121212120-467f3782a9cf
 	github.com/flopp/go-findfont v0.1.0
 	github.com/go-gl/gl v0.0.0-20231021071112-07e5d0ea2e71
@@ -23,7 +24,6 @@ require (
 )
 
 require (
-	github.com/Eiton/vulkan v0.0.0-20251024132427-732131af8682 // indirect
 	github.com/icza/bitio v1.1.0 // indirect
 	github.com/mewkiz/flac v1.0.12 // indirect
 	github.com/mewkiz/pkg v0.0.0-20230226050401-4010bf0fec14 // indirect
@@ -33,7 +33,7 @@ require (
 	github.com/TheTitanrain/w32 v0.0.0-20200114052255-2654d97dbd3d // indirect
 	github.com/ebitengine/oto/v3 v3.2.0 // indirect
 	github.com/ebitengine/purego v0.7.1 // indirect
-	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
+	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0
 	github.com/hajimehoshi/go-mp3 v0.3.4 // indirect
 	github.com/jfreymuth/oggvorbis v1.0.5 // indirect
 	github.com/jfreymuth/vorbis v1.0.2 // indirect
@@ -42,6 +42,6 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/samhocevar/go-meltysynth v0.0.0-20230403180939-aca4a036cb16 // indirect
 	golang.org/x/exp v0.0.0-20220609121020-a51bd0440498
-	golang.org/x/image v0.22.0 // indirect
+	golang.org/x/image v0.22.0
 	golang.org/x/sys v0.18.0
 )
