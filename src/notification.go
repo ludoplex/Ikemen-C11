@@ -60,7 +60,7 @@ func (nm *NotificationManager) AddNotification(message string, notifType Notific
 // Update removes expired notifications and updates positions
 func (nm *NotificationManager) Update() {
 	now := time.Now()
-	
+
 	// Remove expired notifications
 	activeNotifications := make([]*Notification, 0)
 	for _, notif := range nm.notifications {
@@ -69,7 +69,7 @@ func (nm *NotificationManager) Update() {
 		}
 	}
 	nm.notifications = activeNotifications
-	
+
 	// Keep only the most recent notifications if we exceed max visible
 	if len(nm.notifications) > nm.maxVisible {
 		nm.notifications = nm.notifications[len(nm.notifications)-nm.maxVisible:]
@@ -86,17 +86,17 @@ func (nm *NotificationManager) GetOpacity(notif *Notification) float32 {
 	now := time.Now()
 	age := now.Sub(notif.CreatedAt)
 	timeUntilExpiry := notif.ExpiresAt.Sub(now)
-	
+
 	// Fade in
 	if age < nm.fadeInTime {
 		return float32(age) / float32(nm.fadeInTime)
 	}
-	
+
 	// Fade out
 	if timeUntilExpiry < nm.fadeOutTime {
 		return float32(timeUntilExpiry) / float32(nm.fadeOutTime)
 	}
-	
+
 	// Fully visible
 	return 1.0
 }
