@@ -4,7 +4,6 @@
  */
 
 #include "ikemen_engine.h"
-#define UNUSED(x) (void)(x)
 #include <GLFW/glfw3.h>
 #include <stdio.h>
 #include <stdlib.h>
