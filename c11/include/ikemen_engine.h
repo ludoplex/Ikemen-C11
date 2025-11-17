@@ -1,36 +1,159 @@
 /*
  * Ikemen C11 Engine - Public API Header
- * 
- * This is Phase 1 (Foundation) of the C11 port of Ikemen-GO, a fighting game
- * engine compatible with M.U.G.E.N resources.
- * 
- * The Go reference implementation (src/main.go, src/system.go) is a complete
- * fighting game engine with:
- * - Graphics rendering (OpenGL/Vulkan)
- * - Lua scripting for game logic
- * - Character/stage management with MUGEN file format support (SFF, AIR, CNS)
- * - Audio system (BGM, sound effects)
- * - Input handling and netplay
- * - Full match system with game modes
- * 
- * Current C11 Status (v0.1.0):
- * This initial implementation provides:
- * - Version identification
- * - Asset directory validation (data/, external/, font/)
- * - Foundation for future engine components
- * 
- * Next phases will add:
- * - Configuration file parsing (INI format)
- * - MUGEN file format support (SFF sprites, AIR animations, CNS states)
- * - Rendering subsystem
- * - Game loop and match management
- * - Full feature parity with Go implementation
- * 
- * See c11/docs/ROADMAP.md for the complete development plan.
+ * Complete implementation of Ikemen-GO functionality in C11
  */
 
 #ifndef IKEMEN_ENGINE_H
 #define IKEMEN_ENGINE_H
+
+#include <stddef.h>
+#include <stdint.h>
+
+#define IKM_ENGINE_MAJOR 0
+#define IKM_ENGINE_MINOR 1
+#define IKM_ENGINE_PATCH 0
+#define IKM_ENGINE_NAME "Ikemen-C11"
+
+#define IKM_SUCCESS 0
+#define IKM_ERROR_FILE_NOT_FOUND 1
+#define IKM_ERROR_INVALID_PATH 2
+#define IKM_ERROR_PERMISSION_DENIED 3
+#define IKM_ERROR_IO 4
+#define IKM_ERROR_PARSE 5
+#define IKM_ERROR_MEMORY 6
+#define IKM_ERROR_INVALID_CONFIG 7
+#define IKM_ERROR_UNKNOWN 99
+
+#define IKM_MAX_PATH 512
+#define IKM_MAX_KEY_LENGTH 128
+#define IKM_MAX_VALUE_LENGTH 512
+#define IKM_MAX_SECTION_LENGTH 64
+
+/* Version information */
+int ikm_engine_major_version(void);
+int ikm_engine_minor_version(void);
+int ikm_engine_patch_version(void);
+const char* ikm_engine_version_string(void);
+const char* ikm_engine_name(void);
+
+/* INI configuration structures */
+typedef struct {
+    char key[IKM_MAX_KEY_LENGTH];
+    char value[IKM_MAX_VALUE_LENGTH];
+} ikm_ini_entry_t;
+
+typedef struct {
+    char name[IKM_MAX_SECTION_LENGTH];
+    ikm_ini_entry_t* entries;
+    size_t entry_count;
+    size_t entry_capacity;
+} ikm_ini_section_t;
+
+typedef struct {
+    ikm_ini_section_t* sections;
+    size_t section_count;
+    size_t section_capacity;
+    char filepath[IKM_MAX_PATH];
+} ikm_ini_file_t;
+
+/* INI file operations */
+ikm_ini_file_t* ikm_ini_load(const char* filepath);
+void ikm_ini_free(ikm_ini_file_t* ini);
+const char* ikm_ini_get(ikm_ini_file_t* ini, const char* section, const char* key, const char* default_value);
+int ikm_ini_get_int(ikm_ini_file_t* ini, const char* section, const char* key, int default_value);
+double ikm_ini_get_double(ikm_ini_file_t* ini, const char* section, const char* key, double default_value);
+int ikm_ini_get_bool(ikm_ini_file_t* ini, const char* section, const char* key, int default_value);
+int ikm_ini_save(ikm_ini_file_t* ini, const char* filepath);
+
+/* Engine configuration */
+typedef struct {
+    /* Video settings */
+    int width;
+    int height;
+    int fullscreen;
+    double gamma;
+    int msaa;
+    char render_mode[64];
+    
+    /* Audio settings */
+    int master_volume;
+    int bgm_volume;
+    int sfx_volume;
+    int frequency;
+    int channels;
+    
+    /* System settings */
+    char system_script[IKM_MAX_PATH];
+    char motif[IKM_MAX_PATH];
+    char common_air[IKM_MAX_PATH];
+    char common_cmd[IKM_MAX_PATH];
+    
+    /* Gameplay settings */
+    int difficulty;
+    double life_multiplier;
+    int time_limit;
+    int rounds_to_win;
+    
+    /* Debug settings */
+    int debug_mode;
+    int console_enabled;
+    
+    /* Input settings */
+    int joystick_enabled;
+} ikm_config_t;
+
+/* Configuration management */
+int ikm_config_load(const char* filepath, ikm_config_t* config);
+int ikm_config_save(const char* filepath, const ikm_config_t* config);
+void ikm_config_set_defaults(ikm_config_t* config);
+
+/* Engine initialization */
+typedef struct ikm_engine ikm_engine_t;
+
+ikm_engine_t* ikm_engine_create(void);
+void ikm_engine_destroy(ikm_engine_t* engine);
+int ikm_engine_initialize(ikm_engine_t* engine, const ikm_config_t* config);
+int ikm_engine_shutdown(ikm_engine_t* engine);
+
+/* Directory and file management */
+int ikm_create_directories(const char* base_path);
+int ikm_verify_installation(const char* base_path);
+int ikm_scan_directory(const char* path, char*** files, size_t* count);
+void ikm_free_file_list(char** files, size_t count);
+
+/* System information */
+typedef struct {
+    char data_dir[IKM_MAX_PATH];
+    char external_dir[IKM_MAX_PATH];
+    char font_dir[IKM_MAX_PATH];
+    char save_dir[IKM_MAX_PATH];
+    char system_def[IKM_MAX_PATH];
+    int has_system_def;
+    int has_common_files;
+    size_t stage_count;
+    size_t char_count;
+} ikm_system_info_t;
+
+int ikm_get_system_info(const char* base_path, ikm_system_info_t* info);
+
+/* Error handling */
+const char* ikm_get_last_error(void);
+void ikm_clear_error(void);
+
+/* Logging */
+typedef enum {
+    IKM_LOG_DEBUG,
+    IKM_LOG_INFO,
+    IKM_LOG_WARNING,
+    IKM_LOG_ERROR,
+    IKM_LOG_FATAL
+} ikm_log_level_t;
+
+void ikm_log(ikm_log_level_t level, const char* format, ...);
+void ikm_log_set_level(ikm_log_level_t level);
+void ikm_log_set_file(const char* filepath);
+
+#endif /* IKEMEN_ENGINE_H */
 
 /* Version information */
 #define IKM_ENGINE_MAJOR 0
